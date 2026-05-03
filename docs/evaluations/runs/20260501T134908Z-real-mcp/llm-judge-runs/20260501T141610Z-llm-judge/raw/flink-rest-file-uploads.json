@@ -1,0 +1,33 @@
+{
+  "winner": "B",
+  "confidence": 0.72,
+  "scores": {
+    "A": {
+      "correctness": 1,
+      "grounding": 0,
+      "specificity": 1,
+      "usefulness": 1,
+      "risk": 2
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 3
+    }
+  },
+  "rationale": "B is closer because it gives concrete Flink 2.2.0 anchors for docs, `FileUploadsTest`, and a repo path, while A stays generic and explicitly lacks citations. B still appears to misstate the `FileUploads` package path and uses weak doc fragments, so its correctness is only moderate.",
+  "critical_issues": {
+    "A": [
+      "No precise package path or test filename; not usable as an implementation anchor.",
+      "No citations despite the request for version-pinned source artifacts.",
+      "Admits uncertainty instead of identifying the likely source files."
+    ],
+    "B": [
+      "Likely wrong implementation path: `flink-runtime/.../rest/handler/FileUploads.java` may not match Flink's actual package layout.",
+      "The `#part-0001` and `#part-0002` fragments are weak anchors and may not point to the relevant REST upload section.",
+      "Some claims about what the docs explicitly say are only loosely supported."
+    ]
+  }
+}

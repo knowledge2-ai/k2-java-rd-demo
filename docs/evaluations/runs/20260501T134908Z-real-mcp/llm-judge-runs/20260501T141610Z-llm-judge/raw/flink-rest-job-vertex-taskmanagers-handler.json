@@ -1,0 +1,30 @@
+{
+  "winner": "A",
+  "confidence": 0.96,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 1,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A is tightly version-pinned to Flink 2.2.0, names the concrete handler, header, and response classes, and points to adjacent tests with exact paths. B stays generic, omits exact docs and implementation anchors, and speculates about tests and DTO reuse without evidence. For an engineer changing Java code, A is materially more actionable and lower risk.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Does not name the version-pinned docs URL or exact endpoint documentation anchor.",
+      "Uses speculative language like 'typically' and 'if missing' instead of grounded source artifacts.",
+      "Does not provide concrete neighboring test class names or file paths.",
+      "Uncertain claims about response type reuse are unsupported."
+    ]
+  }
+}

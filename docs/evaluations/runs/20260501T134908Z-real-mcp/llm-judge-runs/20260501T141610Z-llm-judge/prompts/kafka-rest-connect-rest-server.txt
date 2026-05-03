@@ -1,0 +1,132 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-rest-connect-rest-server
+TITLE: Kafka Connect pattern for ConnectRestServer
+QUESTION:
+For Kafka Connect REST 4.2.0, inspect `ConnectRestServer`: trace Connect REST server wiring. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka 4.2.0 Connect REST administration docs, the `ConnectRestServer` implementation in `connect/runtime`, and the local server/resource tests in the same package. The retrieved evidence confirms `ConnectRestServer` is the server entry point and that it extends `RestServer` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java].
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect Administration 4.2: `https://kafka.apache.org/42/kafka-connect/administration/` [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+  - Kafka Connect Overview 4.2: `https://kafka.apache.org/42/kafka-connect/overview/` [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Implementation class:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java`
+  - Confirmed facts from retrieval system: package `org.apache.kafka.connect.runtime.rest`, class `ConnectRestServer`, extends `RestServer`, constructor takes `(Integer rebalanceTimeoutMs, RestClient restClient, Map<?, ?> props)`, and `initializeResources(Herder herder)` delegates into `super.initializeResources()` after storing the herder [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java].
+- Neighboring implementation context:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java]
+  - `connect/api/src/main/java/org/apache/kafka/connect/rest/ConnectRestExtension.java` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/rest/ConnectRestExtension.java]
+  - `connect/api/src/main/java/org/apache/kafka/connect/rest/ConnectRestExtensionContext.java` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/rest/ConnectRestExtensionContext.java]
+
+**Tests to inspect or add**
+- Primary server test:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java]
+- Nearby REST resource tests that likely reflect server wiring and endpoint behavior:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java]
+- Additional nearby test if you need plugin-related REST behavior:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java]
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/administration/#part-0001], [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java]
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java]
+
+**Uncertainties**
+- The retrieved evidence truncated the body of `ConnectRestServer.java`, so I can confirm the server class, superclass, constructor, and `initializeResources(Herder)`, but not every registered resource or binder from the full file.
+- The docs evidence surfaced the top-level 4.2 administration and overview pages, but not a more granular endpoint-by-endpoint REST reference page.
+
+ANSWER B:
+**Recommendation**
+Anchor the writeup on the Kafka 4.2.0 Connect docs, then trace the runtime wiring through `ConnectRestServer` and confirm behavior with the closest REST-server unit tests. If you need one narrow path, start at the REST server constructor/bootstrap path and follow how it builds the embedded `RestServer`, config, and handlers.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java`
+- Likely adjacent wiring helpers in the same area, especially `ConnectRestConfig` and `RestServer`
+- Version-pinned docs: Kafka 4.2.0 Connect documentation on the 4.2 release docs site, likely `https://kafka.apache.org/42/documentation.html`
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerTest.java`
+- If you need broader coverage, add or inspect an integration-style test in the same `connect/runtime` area that boots a full Connect runtime and exercises REST startup/shutdown wiring
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerTest.java`
+- `https://kafka.apache.org/42/documentation.html`
+
+**Uncertainties**
+- I’m not fully certain of the exact Connect docs section anchor inside the 4.2.0 documentation page without checking the tree.
+- I expect `ConnectRestServerTest` and `RestServerTest` to be the nearest unit tests, but the exact neighboring integration test names can vary slightly across the 4.2.0 branch.

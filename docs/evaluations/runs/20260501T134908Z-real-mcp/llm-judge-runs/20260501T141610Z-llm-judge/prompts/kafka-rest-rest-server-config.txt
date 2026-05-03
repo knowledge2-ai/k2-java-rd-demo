@@ -1,0 +1,124 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-rest-rest-server-config
+TITLE: Kafka Connect pattern for RestServerConfig
+QUESTION:
+For Kafka Connect REST 4.2.0, inspect `RestServerConfig`: inspect Connect REST server configuration. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka 4.2.0 Connect REST administration docs plus the `RestServerConfig` implementation and its dedicated regression test. The retrieved evidence points to `RestServerConfig` as the configuration surface for `RestServer` and shows the version-pinned docs under Kafka 4.2, not an unversioned or latest-only page [https://kafka.apache.org/42/kafka-connect/administration/#part-0001], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/RestServerConfig.java].
+
+**Implementation anchors**
+- Version-pinned docs: Kafka Connect Administration 4.2 and Kafka Connect Overview 4.2 [https://kafka.apache.org/42/kafka-connect/administration/#part-0001], [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Implementation class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/RestServerConfig.java` in `apache/kafka@4.2` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/RestServerConfig.java]
+- Related runtime anchor: `ConnectRestServer` extends `RestServer`, which is the runtime consumer of this config surface [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java]
+
+**Tests to inspect or add**
+- Primary neighboring regression test: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerConfigTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerConfigTest.java]
+- Adjacent REST tests in the same area that may provide patterns or coverage context:
+  - `InternalConnectResourceTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java]
+  - `RootResourceTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java]
+  - `LoggingResourceTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java]
+- If you need to add coverage, start with `RestServerConfigTest` and only extend into the resource tests if the config behavior affects REST resource wiring or defaults.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Docs: [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/RestServerConfig.java]
+- Runtime consumer: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerConfigTest.java]
+- Neighbor tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java]
+
+**Uncertainties**
+- The retrieval system excerpt confirms the anchor artifacts, but it does not enumerate the exact assertions inside `RestServerConfigTest`.
+- The docs surfaced are the version-pinned Connect administration/overview pages; retrieval did not return a docs page specifically named `RestServerConfig`, so any direct doc-to-class mapping is an inference from the Connect REST admin surface.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the 4.2.0 Connect configuration docs, then confirm behavior in `RestServerConfig` and the same-package REST tests.
+- If you need a precise user-facing contract, treat the docs as authoritative and the tests as the behavioral spec.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/RestServerConfig.java`
+- `docs/connect.html` for the Connect worker/REST configuration docs in the 4.2.0 source tree
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerConfigTest.java`
+- Other same-package neighbors under `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/`, especially any `RestServer*Test` coverage
+- If config parsing or validation changed, add/extend a focused unit test in that package rather than only relying on broader Connect integration tests
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/RestServerConfig.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerConfigTest.java`
+- `docs/connect.html`
+
+**Uncertainties**
+- I am not certain of the exact version-pinned public URL/anchor for the 4.2.0 docs from memory.
+- I’m also not certain whether the nearest sibling test is exactly named `RestServerTest` or a similarly named REST test in the same package.

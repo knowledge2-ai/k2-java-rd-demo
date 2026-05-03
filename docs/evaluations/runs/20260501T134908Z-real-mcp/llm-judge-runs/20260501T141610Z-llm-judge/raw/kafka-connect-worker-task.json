@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.66,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A is safer and more aligned with WorkerTask lifecycle inspection: it names the right runtime class and the closest sibling tests, and it explicitly flags uncertainty about the pinned docs URL. B is more concrete on paper, but it overcommits to unverified doc URLs and includes an integration test that is not a direct WorkerTask lifecycle neighbor.",
+  "critical_issues": {
+    "A": [
+      "Docs anchor is vague; it does not pin a concrete Kafka 4.2.0 URL or artifact path.",
+      "Neighboring test guidance is broad and could be tightened to the exact runtime test classes."
+    ],
+    "B": [
+      "Exact doc URLs are asserted without evidence and may not match the Kafka 4.2.0 site layout.",
+      "ExactlyOnceSourceIntegrationTest is not a direct neighboring test for WorkerTask lifecycle behavior.",
+      "It omits more relevant adjacent classes/tests such as WorkerSourceTaskTest and AbstractWorkerTest."
+    ]
+  }
+}

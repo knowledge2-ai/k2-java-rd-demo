@@ -1,0 +1,30 @@
+You are running a controlled patch-generation benchmark for a Java R&D task.
+You may use the available K2 MCP retrieval tools before editing. Use them to inspect version-specific docs, source, tests, and generated engineering guides. Cite the retrieved source URIs in your final summary. Suggested retrieval query: Flink 2.2 JobVertexWatermarksHandler request parameters MetricCollectionResponseBody tests.
+Web search and browser use are disabled. Keep the patch minimal and scoped. Run only focused tests that are relevant and affordable; if you cannot run a test, state exactly why.
+
+Repository: apache/flink@release-2.2.0
+Framework/version: flink 2.2.0
+Task: Add optional missing-subtask reporting to Flink vertex watermark REST output
+
+Feature request:
+Add a small backwards-compatible request option to the Flink 2.2 `JobVertexWatermarksHandler`. When an optional query parameter named `includeMissing` is true, include one `Metric` per subtask even if the current input watermark metric is absent, using the existing metric id and a null value. Preserve the default behavior when the query parameter is absent or false. Update the focused handler test coverage.
+
+Allowed edit neighborhoods:
+[
+  "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/metrics/",
+  "flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/metrics/",
+  "flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/metrics/"
+]
+
+Success criteria:
+[
+  "`includeMissing` is optional and defaults to current behavior.",
+  "Missing watermark metrics are emitted only when explicitly requested.",
+  "Focused handler tests cover default, partial, and include-missing behavior."
+]
+
+Final response requirements:
+- Summarize the implemented code changes.
+- List tests run and their result.
+- List any remaining uncertainty.
+- Do not include large code blocks; the benchmark records the git diff separately.

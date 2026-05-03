@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.92,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better anchored for Kafka Connect 4.2.0: it names version-pinned docs, the concrete implementation class, and the nearest test file. B is directionally right but too vague, omits the doc anchors, and adds less actionable guidance for an engineer changing standalone config-update behavior.",
+  "critical_issues": {
+    "A": [
+      "Does not name exact test methods or assertions inside `StandaloneHerderTest`.",
+      "Some source URIs are plausible but not independently verified in the answer."
+    ],
+    "B": [
+      "No version-pinned docs URL, which was explicitly requested.",
+      "Too vague on neighboring tests and implementation details for code changes.",
+      "Relies on general behavior language without concrete anchors."
+    ]
+  }
+}

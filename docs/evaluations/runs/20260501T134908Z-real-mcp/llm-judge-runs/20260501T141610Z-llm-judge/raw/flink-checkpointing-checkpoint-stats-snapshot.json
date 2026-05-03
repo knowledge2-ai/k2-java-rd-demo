@@ -1,0 +1,32 @@
+{
+  "winner": "B",
+  "confidence": 0.91,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 3
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    }
+  },
+  "rationale": "B is stronger because it names version-pinned Flink 2.2.0 docs, the exact `CheckpointStatsSnapshot` implementation path, and concrete neighboring tests. A is directionally right but too vague on docs and test anchors. B has a small risk of overclaiming test existence, but overall it is far more actionable and grounded for an engineer inspecting checkpoint stats behavior.",
+  "critical_issues": {
+    "A": [
+      "Docs are not version-pinned with exact URLs, so the anchor is too vague for 2.2.0.",
+      "Neighboring tests are speculative and not concrete enough to inspect immediately.",
+      "No direct citation to a specific 2.2.0 source artifact beyond the class path."
+    ],
+    "B": [
+      "It may overstate the existence or relevance of `CheckpointStatsSnapshotTest` without verifying the file directly.",
+      "The repo URI citations are helpful but should be validated against the actual checkout."
+    ]
+  }
+}

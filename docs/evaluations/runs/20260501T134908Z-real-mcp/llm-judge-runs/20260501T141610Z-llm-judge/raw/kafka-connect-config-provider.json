@@ -1,0 +1,30 @@
+{
+  "winner": "A",
+  "confidence": 0.88,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 2,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 4
+    }
+  },
+  "rationale": "A is more version-specific and better anchored to Kafka 4.2 docs plus the `clients` module. It names the exact concrete class `FileConfigProvider` and cites the relevant 4.2 configuration pages. B is directionally right, but it is less grounded, omits version-pinned URLs, and introduces `ConfigTransformer` as extra context rather than the requested anchor.",
+  "critical_issues": {
+    "A": [
+      "Slightly overstates `ConfigProvider` as an implementation anchor; the concrete anchor should be `FileConfigProvider` for externalized secrets examples."
+    ],
+    "B": [
+      "Does not give version-pinned 4.2.0 doc URLs, so it is less useful as an anchor.",
+      "Adds `ConfigTransformer` without evidence that it is the requested anchor for the contract question."
+    ]
+  }
+}

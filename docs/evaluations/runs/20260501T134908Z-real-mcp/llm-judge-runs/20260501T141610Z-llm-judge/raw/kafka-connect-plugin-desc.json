@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.92,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A is better anchored: it names a concrete implementation class, a real test, and version-pinned Kafka 4.2 docs, while explicitly noting uncertainty. B is weaker because its docs path is vague and it names adjacent tests that may not exist, which raises hallucination risk. For engineer use, A gives actionable files and surrounding code paths.",
+  "critical_issues": {
+    "A": [
+      "No major issue; main limitation is that it does not quote specific assertions from PluginDescTest."
+    ],
+    "B": [
+      "Likely fabricates or guesses neighboring tests (`PluginUtilsTest`, `PluginScannerTest`) without evidence.",
+      "Docs anchor is vague and not clearly version-pinned to Kafka 4.2.0.",
+      "Overstates confidence about metadata contract details without concrete source support."
+    ]
+  }
+}

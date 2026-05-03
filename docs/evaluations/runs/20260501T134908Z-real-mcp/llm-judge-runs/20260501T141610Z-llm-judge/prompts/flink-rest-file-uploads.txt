@@ -1,0 +1,123 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-file-uploads
+TITLE: Flink REST pattern for FileUploads
+QUESTION:
+For Flink REST API 2.2.0, inspect `FileUploads`: inspect uploaded-file tracking for REST requests. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the answer on the 2.2.0 REST API docs for multipart upload behavior, then tie it to the `FileUploads` helper that owns request-scoped temp-file tracking and cleanup.
+- Treat the key behavior as: uploaded files are registered while the REST request is being parsed, then unregistered/deleted on normal completion and on failure paths.
+
+**Implementation anchors**
+- Version-pinned docs: the Flink 2.2.0 REST API docs page covering file uploads / multipart requests.
+- Implementation class: `FileUploads` in the REST handler stack.
+- Lifecycle path: the REST request parsing and handler-completion code that adds uploads to the request-scoped tracker and disposes them afterward.
+
+**Tests to inspect or add**
+- The unit test for `FileUploads` itself.
+- Nearby REST handler tests that cover:
+  - successful request completion
+  - parse/validation failure after upload creation
+  - handler exception after upload parsing
+- Add or extend a regression test that proves uploaded files are deregistered and cleaned up even when the request fails after parsing.
+
+**Citations**
+- None confirmed from memory with enough certainty to cite precisely.
+
+**Uncertainties**
+- I am not certain of the exact 2.2.0 package path for `FileUploads` (`rest.handler` vs `rest.handler.util`).
+- I am also not certain of the exact version-pinned docs URL/path for the multipart upload section, so verify those against the 2.2.0 release tag before using them as hard references.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Flink 2.2.0 REST API docs, the `FileUploads` implementation in `flink-runtime`, and the dedicated `FileUploadsTest`. The strongest doc anchor is the core REST API page plus its “Developing” section, which points implementation work to `flink-runtime` and the REST handler model [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001) [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002).
+
+**Implementation anchors**
+- Version-pinned docs: `flink/flink-docs-release-2.2/docs/ops/rest_api/index.html` for the REST API overview and development guidance [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001).
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/FileUploads.java`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/FileUploads.java`.
+- Behavior anchor from the implementation snippet: `FileUploads` is a container for uploaded files, supports directory cleanup on `close()`, and has an `EMPTY` singleton.
+- If you need the broader REST backend context, the docs explicitly say the REST backend lives in `flink-runtime` and is routed through `WebMonitorEndpoint` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002).
+
+**Tests to inspect or add**
+- Existing direct test anchor: `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/FileUploadsTest.java`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/FileUploadsTest.java`.
+- This test already covers the key tracking behavior surfaced by retrieval system: relative-path rejection and directory scanning/collection.
+- If you add coverage, keep it adjacent to `FileUploadsTest` and focus on uploaded-file tracking edge cases: nested directory traversal, duplicate file handling if applicable, and cleanup on `close()`.
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001)
+- Docs developing section: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002)
+- Implementation: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/FileUploads.java`
+- Test: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/FileUploadsTest.java`
+
+**Uncertainties**
+- retrieval system surfaced a strong direct test anchor only for `FileUploadsTest`; it did not return a richer set of neighboring REST-handler tests specifically around `FileUploads`.
+- The doc evidence is version-pinned and relevant to REST handler architecture, but it does not name `FileUploads` explicitly; the direct `FileUploads` contract comes from the implementation and test sources.

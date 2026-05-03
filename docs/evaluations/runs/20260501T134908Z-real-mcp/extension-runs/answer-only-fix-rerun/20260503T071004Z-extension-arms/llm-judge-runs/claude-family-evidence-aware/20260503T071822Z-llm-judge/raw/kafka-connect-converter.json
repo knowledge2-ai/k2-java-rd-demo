@@ -1,0 +1,35 @@
+```json
+{
+  "winner": "A",
+  "confidence": 0.72,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 2,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 3
+    }
+  },
+  "rationale": "A's core claims are directly confirmed by evidence snippets: Plugins.java L463 showing isKeyConverter derivation, BooleanConverter showing ConverterType.KEY/VALUE usage, ConnectorConfig and Plugins snippets. B cites MultiVersionTest.testVersionedConverter, PluginRecommenderTest.testConverterVersionRecommenders, and WorkerTest versioned methods — plausible but unverified by its single thin evidence entry. B's grounding is severely weakened by having only one evidence snippet with no code content.",
+  "critical_issues": {
+    "A": [
+      "StringConverter.configure isKey claim is inferred from BooleanConverter evidence, not directly evidenced from StringConverter source",
+      "PluginsTest method names (shouldFailToFindConverterInCurrentClassloader, newConverterShouldConfigureWithPluginClassLoader at L345-L379) are unverified by evidence snippets"
+    ],
+    "B": [
+      "MultiVersionTest.testVersionedConverter, PluginRecommenderTest.testConverterVersionRecommenders, and WorkerTest.verifyVersionedTaskConverterFromConnector/verifyVersionedTaskConverterFromWorker are all unverified — hallucination risk",
+      "NumberConverter cited as 'clearest exemplar' without supporting evidence snippet",
+      "Converter.java L40-L98 'default header-aware overloads' claim is unverified",
+      "Evidence base is a single entry with no code snippet content, making all claims unverifiable"
+    ]
+  }
+}
+```

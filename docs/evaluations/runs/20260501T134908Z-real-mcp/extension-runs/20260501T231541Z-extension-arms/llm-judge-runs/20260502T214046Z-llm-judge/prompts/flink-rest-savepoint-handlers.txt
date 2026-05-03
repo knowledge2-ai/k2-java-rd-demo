@@ -1,0 +1,163 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-savepoint-handlers
+TITLE: Flink REST pattern for SavepointHandlers
+QUESTION:
+For Flink REST API 2.2.0, inspect `SavepointHandlers`: trace savepoint trigger and polling REST behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the release-2.2.0 Flink runtime savepoint REST handler and the nearest tests, with only broad checkpointing/state docs as supporting context. retrieval system did not surface a savepoint-specific version-pinned doc page, so do not overclaim beyond the evidence.
+
+**Implementation anchors**
+- Primary implementation class: `SavepointHandlers` in `flink-runtime` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java]
+- The returned retrieval system snippet shows `SavepointHandlerBase` extends `AbstractRestHandler<..., TriggerResponse, SavepointTriggerMessageParameters>`, which is the correct anchor for trigger/poll REST behavior, but retrieval system did not include the method bodies in the excerpt [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java]
+- Version-pinned docs to cite for surrounding checkpoint/savepoint semantics:
+  - Checkpoints docs [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - State Processor API docs, which explicitly mention savepoints and checkpoints [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/libs/state_processor_api/#part-0001]
+  - State Backends docs for checkpoint/state context [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001]
+
+**Tests to inspect or add**
+- Existing neighbor test: `SavepointHandlersTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java]
+- Adjacent behavior test: `StopWithSavepointHandlersTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/StopWithSavepointHandlersTest.java]
+- If you are adding coverage, focus on:
+  - Trigger response shape and operation key propagation
+  - Polling path behavior after trigger
+  - Success vs in-progress vs failure transitions
+
+**Citations**
+- `SavepointHandlers`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java]
+- `SavepointHandlersTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java]
+- `StopWithSavepointHandlersTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/StopWithSavepointHandlersTest.java]
+- Checkpoints docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+- State Processor API docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/libs/state_processor_api/#part-0001]
+- State Backends docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001]
+
+**Uncertainties**
+- retrieved evidence did not include the specific `SavepointHandlers` methods that implement trigger and polling, so exact REST status transitions and endpoint semantics should be verified directly in the source file.
+- retrieval system did not surface a savepoint-REST-specific version-pinned doc page for Flink 2.2.0, so the docs above are contextual anchors rather than direct API references.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the versioned REST-doc pipeline plus the savepoint REST handler itself. In this checkout, the runtime REST docs are generated for `RuntimeRestAPIVersion.V1` into `rest_v1_dispatcher.html`, and the savepoint endpoints are exposed through `DocumentingDispatcherRestEndpoint` rather than a standalone savepoint markdown page.  
+  - `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L62-L83`
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java#L30-L34`
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/DocumentingDispatcherRestEndpoint.java#L51-L87`
+
+**Implementation anchors**
+- `SavepointHandlers` is the implementation class to cite for the trigger/poll flow. Its class Javadoc describes the two-step async behavior, `POST /jobs/:jobid/savepoints` for trigger, and `GET /jobs/:jobid/savepoints/:savepointtriggerid` for polling.  
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java#L64-L115`
+- The trigger path is in `SavepointTriggerHandler`: it validates the target directory, derives `TriggerSavepointMode.SAVEPOINT` or `CANCEL_WITH_SAVEPOINT`, and calls `gateway.triggerSavepoint(..., RpcUtils.INF_TIMEOUT)`.  
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java#L218-L259`
+- The poll path is in `SavepointStatusHandler`: it calls `gateway.getTriggeredSavepointStatus(key)` and maps `SUCCESS` to a completed `SavepointInfo`, `FAILURE` to a completed failure payload, `IN_PROGRESS` to in-progress, and `UnknownOperationKeyException` to HTTP 404.  
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java#L262-L347`
+- The REST shape is fixed by the headers:
+  - Trigger: `SavepointTriggerHeaders` -> `POST /jobs/:jobid/savepoints`, `202 ACCEPTED`.  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerHeaders.java#L27-L84`
+  - Poll: `SavepointStatusHeaders` -> `GET /jobs/:jobid/savepoints/:triggerid`, `200 OK`.  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointStatusHeaders.java#L27-L79`
+- `WebMonitorEndpoint` wires the handlers into the REST endpoint, so it is the runtime registration point worth citing alongside the class.  
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L561-L573`
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L820-L824`
+
+**Tests to inspect or add**
+- Existing neighbor unit tests for the savepoint REST flow:
+  - `SavepointHandlersTest` covers happy path completion, default directory fallback, missing-directory validation, exception propagation, provided trigger IDs, and unknown-operation 404.  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java#L66-L279`
+  - `StopWithSavepointHandlersTest` mirrors the same shape for stop-with-savepoint.  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/StopWithSavepointHandlersTest.java#L62-L254`
+- Message-body and response marshalling tests that should stay adjacent to any docs/behavior change:
+  - `SavepointTriggerRequestBodyTest`  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerRequestBodyTest.java#L34-L101`
+  - `StopWithSavepointTriggerRequestBodyTest`  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/StopWithSavepointTriggerRequestBodyTest.java#L35-L104`
+  - `SavepointInfoMarshallingTest`  
+    `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointInfoMarshallingTest.java#L33-L80`
+- If you change status mapping or error handling, add/keep a regression for `UnknownOperationKeyException -> 404` in `SavepointHandlersTest`.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L62-L83`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java#L30-L34`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/DocumentingDispatcherRestEndpoint.java#L51-L87`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java#L64-L115`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java#L218-L347`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerHeaders.java#L27-L84`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointStatusHeaders.java#L27-L79`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L561-L573`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L820-L824`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java#L66-L279`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/StopWithSavepointHandlersTest.java#L62-L254`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerRequestBodyTest.java#L34-L101`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/StopWithSavepointTriggerRequestBodyTest.java#L35-L104`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointInfoMarshallingTest.java#L33-L80`
+
+**Uncertainties**
+- I did not find a separate hand-authored savepoint REST docs page in this checkout; the reliable version-pinned anchor is the generated runtime REST API path above.
+- `SavepointHandlers` Javadoc has one wording inconsistency (`target-property`), but the code and tests consistently use `target-directory` / `targetDirectory`; I treated code/tests as authoritative.

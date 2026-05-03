@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.79,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A is better anchored to Kafka Connect-specific, version-pinned docs and gives concrete nearby tests plus a cautious uncertainty note. B has some plausible implementation detail, but its doc anchors are broader and less topic-specific, and several test suggestions are more generic/less verified. A is more useful for an engineer tracing validation in the herder layer with lower hallucination risk.",
+  "critical_issues": {
+    "A": [
+      "May overstate ConnectorConfig as the main validator source for connector validation flow; it is an adjacent anchor, not necessarily the herder entrypoint.",
+      "Uses repo:// URIs that may not be externally verifiable from the answer alone."
+    ],
+    "B": [
+      "Doc anchors are weaker and less Connect-specific than requested; the landing page and Javadocs do not directly anchor the validation flow.",
+      "Claims validateConnectorConfig(...) and nearby REST test names without sufficient verification."
+    ]
+  }
+}

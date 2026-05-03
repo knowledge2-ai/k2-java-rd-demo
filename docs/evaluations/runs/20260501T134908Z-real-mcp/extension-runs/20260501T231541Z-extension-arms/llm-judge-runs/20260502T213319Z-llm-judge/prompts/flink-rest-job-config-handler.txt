@@ -1,0 +1,148 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-config-handler
+TITLE: Flink REST pattern for JobConfigHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobConfigHandler`: inspect how job configuration is exposed through REST. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use `GET /jobs/:jobid/config` as the contract anchor. In Flink 2.2.0 this endpoint is exposed by `JobConfigHandler`, described by `JobConfigHeaders`, and serialized as `JobConfigInfo`. The stable, version-pinned REST docs path is the `v1` runtime REST doc generator flow, not a handwritten page in this checkout.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandler.java:43-94`  
+  Main handler: reads the archived execution graph, builds `JobConfigInfo`, and archives JSON under `/jobs/:jobid/config`.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigHeaders.java:26-73`  
+  REST contract: `GET`, response `JobConfigInfo`, URL `"/jobs/:jobid/config"`, description “Returns the configuration of a job.”
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigInfo.java:47-245`  
+  Response schema: `jid`, `name`, optional `execution-config`; `ExecutionConfigInfo.from(...)` hides sensitive global job parameters.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java:366-373`  
+  Wiring into the live REST endpoint.
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java:62-83` and `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java:30-34`  
+  Version-pinned docs source: emits `rest_v1_dispatcher.html` for stable `V1`; `V0` is test-only.
+- `repo://apache/flink@release-2.2.0/flink-docs/README.md:24-36`  
+  Docs integration rule: generated REST API docs are embedded from generated HTML files.
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java:46-84`  
+  Direct regression test for secret masking in global job parameters.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobManagerJobConfigurationHandlerTest.java:37-66`  
+  Neighboring config-endpoint test; useful as a reference for the job-manager-side configuration endpoint.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java:37-65`  
+  Keeps `/jobs/:jobid/config` in the endpoint URL ordering contract.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersionTest.java:30-50`  
+  Confirms `V1` is the latest/default runtime REST version.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/compatibility/RestAPIStabilityTestUtils.java:44-78`  
+  Versioned REST snapshot harness; relevant if the endpoint shape or versioning changes.
+- If adding coverage, the main gap is a test for the serialized JSON shape when `execution-config` is absent.
+
+**Citations**
+- Handler: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandler.java:43-94`
+- Headers: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigHeaders.java:26-73`
+- Response body: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigInfo.java:47-245`
+- Endpoint wiring: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java:366-373`
+- Docs generator: `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java:62-83`
+- Version enum: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java:30-34`
+- Docs README: `repo://apache/flink@release-2.2.0/flink-docs/README.md:24-36`
+- Direct test: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java:46-84`
+- Neighbor test: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobManagerJobConfigurationHandlerTest.java:37-66`
+- URL-order test: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java:37-65`
+- Version test: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersionTest.java:30-50`
+- Stability harness: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/compatibility/RestAPIStabilityTestUtils.java:44-78`
+
+**Uncertainties**
+- I did not find a checked-in rendered REST docs page for this endpoint in the checkout; the reliable docs anchor here is the generator pipeline plus `V1`.
+- There is no dedicated test in the inspected files for the exact JSON shape when `execution-config` is null, so that would be the first test I’d add if you change serialization behavior.
+
+ANSWER B:
+**Recommendation**
+Use the 2.2.0 REST API docs as the public contract, then anchor implementation details on `JobConfigHandler` and `JobConfigHandlerTest`. The docs explicitly document `GET /jobs/:jobid/jobmanager/config` as returning the job manager configuration for a specific job [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0029]. The general REST API page also establishes that Flink’s REST API is versioned and that the backend lives in `flink-runtime` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002].
+
+**Implementation anchors**
+- Public REST contract: `GET /jobs/:jobid/jobmanager/config` returning `ConfigurationInfoEntry[]` for a job [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0029].
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandler.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandler.java].
+- Message/header wiring: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigHeaders.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigHeaders.java].
+- REST backend guidance in docs: add `MessageHeaders`, an `AbstractRestHandler`, then register it in `WebMonitorEndpoint` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002].
+
+**Tests to inspect or add**
+- Primary neighboring test: `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java].
+- Nearby job-handler patterns: `JobDetailsHandlerTest` and `JobsOverviewHandlerTest` are the closest adjacent REST handler tests surfaced by retrieval system for this area [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobsOverviewHandlerTest.java].
+
+**Citations**
+- REST API docs, version-pinned to 2.2.0: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001]
+- REST API handler development guidance: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- Job config endpoint docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0029]
+- `JobConfigHandler`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandler.java]
+- `JobConfigHeaders`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobConfigHeaders.java]
+- `JobConfigHandlerTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java]
+
+**Uncertainties**
+- retrieval system surfaced the handler and its test, but the returned evidence did not include the full method body of `JobConfigHandler`, so I am not claiming details beyond the documented route and the class/header wiring.
+- I did not verify whether there are additional subtests or newer neighbors beyond the surfaced job-handler tests; the anchors above are the ones directly supported by retrieved evidence.

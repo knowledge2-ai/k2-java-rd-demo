@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.95,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 1,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 3,
+      "risk": 1
+    }
+  },
+  "rationale": "A is closer to the likely Flink 2.2.0 surface: it anchors the `JobConfigHandler` class and the matching handler test, and it avoids overclaiming about route/POJO details. B is more detailed but appears to conflate the endpoint with a `jobmanager/config` route and asserts a return type and doc anchors too confidently, which is a high-risk mismatch for this API surface.",
+  "critical_issues": {
+    "A": [
+      "Does not pin the exact REST doc subsection or verified response type, so the anchor set is incomplete."
+    ],
+    "B": [
+      "Likely hallucinates the route as `/jobs/:jobid/jobmanager/config` instead of the job config endpoint.",
+      "Overstates the exact return type and doc anchors without sufficient grounding.",
+      "Mixes in generic REST wiring guidance that is not specific to `JobConfigHandler`."
+    ]
+  }
+}

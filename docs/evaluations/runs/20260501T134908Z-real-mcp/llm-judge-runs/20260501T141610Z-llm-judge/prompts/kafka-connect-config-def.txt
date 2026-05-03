@@ -1,0 +1,147 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-config-def
+TITLE: Kafka Connect pattern for ConfigDef
+QUESTION:
+For Kafka Connect 4.2.0, inspect `ConfigDef`: explain Kafka configuration definition and validation semantics. Which version-pinned docs and implementation class should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "clients"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the explanation on the Kafka 4.2.0 version-pinned Kafka Connect docs and the `ConfigDef` implementation in the core Kafka codebase. retrieved evidence supports the docs pages and Connect-side validator usage, but it did not directly return the `ConfigDef` source URI itself, so that class should be verified in-repo before making exact claims. [https://kafka.apache.org/42/kafka-connect/] [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019]
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page: [https://kafka.apache.org/42/kafka-connect/]
+  - Connector Development Guide: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+  - Kafka Connect Configs reference: [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+- Implementation to inspect:
+  - `org.apache.kafka.common.config.ConfigDef` as the definition/validation API anchor. retrieval system did not surface its source URI directly, so treat this as the class to confirm in the Kafka 4.2.0 repo rather than a fully sourced claim.
+  - Connect-side validator implementations showing how `ConfigDef.Validator` is used:
+    - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/util/InstantiableClassValidator.java`
+    - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java`
+
+**Tests to inspect or add**
+- Inspect tests that exercise connector config validation paths around `ConnectorConfig` and custom validators.
+- Add or strengthen tests that confirm:
+  - type/default/importance metadata is preserved in `ConfigDef`
+  - validator failures surface useful messages
+  - plugin-version and class-instantiation validators reject invalid values
+- retrieval did not return a direct `ConfigDefTest` artifact for Kafka 4.2.0 Connect, so this test target remains a gap to verify in-repo.
+
+**Citations**
+- Kafka Connect overview and doc anchor: [https://kafka.apache.org/42/kafka-connect/]
+- Connector development guidance on exposing `config()` and framework validation: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019]
+- Kafka Connect config reference showing validator-backed fields: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- `InstantiableClassValidator` implementation: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/util/InstantiableClassValidator.java`
+- `ConnectorConfig` implementation: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java`
+
+**Uncertainties**
+- retrieval did not return the actual `ConfigDef` source file URI, so I cannot cite its exact implementation details from evidence here.
+- The docs evidence is clear that Connect uses `config()` plus validators for pre-submit validation, but the precise `ConfigDef` method-level semantics should be confirmed against the source before quoting them as authoritative.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the Apache Kafka 4.2.0 Javadocs for `org.apache.kafka.common.config.ConfigDef`, with `org.apache.kafka.common.config.AbstractConfig` as the parse/validation entrypoint.
+- For Kafka Connect specifically, call out that Connect uses the shared Kafka config framework; it does not have a separate Connect-only `ConfigDef`.
+- Semantics to state:
+  - `ConfigDef` is a declarative schema for config keys: name, type, default, validator, documentation, importance, grouping/display metadata, dependents, and recommender.
+  - If a key has no default, it is required.
+  - Parsing coerces raw inputs into the declared type before validation.
+  - Validators run on the parsed value and raise `ConfigException` on failure.
+  - Defaults are applied before validation.
+  - `dependents` and `recommender` are primarily for docs/UI/helpful visibility, not automatic cross-field enforcement.
+  - Cross-field/runtime behavior is usually enforced by the consuming config class or custom validators, not by `ConfigDef` alone.
+
+**Implementation anchors**
+- Primary class: `org.apache.kafka.common.config.ConfigDef`
+- Parse/validation consumer: `org.apache.kafka.common.config.AbstractConfig`
+- Connect usage examples to reference in prose:
+  - `WorkerConfig`
+  - `ConnectorConfig`
+  - any other Connect config class that builds a `ConfigDef`
+
+**Tests to inspect or add**
+- Inspect existing unit coverage for:
+  - required key missing
+  - default value injection
+  - type coercion failures
+  - built-in validator failures such as range/allowed-values/non-null
+  - custom validator exception propagation
+  - dependent/recommender metadata behavior
+- Add or extend tests in:
+  - `ConfigDef` unit tests
+  - `AbstractConfig` unit tests
+  - Connect config tests for worker/connector configs if you need end-to-end coverage of how Connect consumes `ConfigDef`
+
+**Citations**
+- https://kafka.apache.org/42/javadoc/org/apache/kafka/common/config/ConfigDef.html
+- https://kafka.apache.org/42/javadoc/org/apache/kafka/common/config/AbstractConfig.html
+
+**Uncertainties**
+- I’m confident about the framework semantics above, but I am not certain whether the Kafka 4.2.0 site exposes a separate generated Connect-config page with a stable public path.
+- Exact built-in validator names and some edge-case coercion behavior can vary slightly by release; if you need release-perfect wording, verify against the 4.2.0 Javadocs for `ConfigDef`.

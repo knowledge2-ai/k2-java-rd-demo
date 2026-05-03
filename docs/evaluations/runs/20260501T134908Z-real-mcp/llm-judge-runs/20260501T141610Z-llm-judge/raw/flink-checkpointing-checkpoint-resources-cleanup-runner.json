@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.95,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A is much better anchored to version-pinned Flink 2.2.0 docs, the concrete runtime class, and a direct neighboring test file. B is too vague, gives an apparently wrong package for the class, and lacks verifiable test or doc anchors. A has some mild overreach in adjacent-test suggestions, but it is still the only answer that is concretely source-grounded.",
+  "critical_issues": {
+    "A": [
+      "Claims the runner implements JobManagerRunner without showing source evidence; that may be inaccurate.",
+      "Some neighboring tests listed are adjacent checkpoint tests, not clearly tied to CheckpointResourcesCleanupRunner behavior."
+    ],
+    "B": [
+      "Uses an apparently wrong class package path: org.apache.flink.runtime.checkpoint.CheckpointResourcesCleanupRunner instead of the runtime dispatcher cleanup package.",
+      "Fails to name concrete docs, tests, or source URIs, so it is not sufficiently grounded for an engineer.",
+      "Speculates about lifecycle and edge cases without anchoring them to Flink 2.2.0 artifacts."
+    ]
+  }
+}

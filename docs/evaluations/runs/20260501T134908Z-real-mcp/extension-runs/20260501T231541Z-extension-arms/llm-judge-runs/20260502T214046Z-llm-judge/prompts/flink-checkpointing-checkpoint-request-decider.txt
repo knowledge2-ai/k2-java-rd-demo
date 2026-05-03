@@ -1,0 +1,147 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-checkpoint-request-decider
+TITLE: Flink checkpointing pattern for CheckpointRequestDecider
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CheckpointRequestDecider`: explain checkpoint request scheduling decisions. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Treat `CheckpointRequestDecider` as the primary source of truth for checkpoint request scheduling in Flink 2.2.0: it makes a three-way decision to `execute`, `drop`, or `postpone` a checkpoint request, and dropped requests fail immediately [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java].
+- Ground the behavior in the 2.2.0 checkpointing docs first, then tie it back to the decider’s failure modes and queueing behavior so the explanation stays aligned with public semantics [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpointing_under_backpressure/].
+
+**Implementation anchors**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java` is the core implementation anchor; the class Javadoc says it decides whether a checkpoint trigger request should be executed, dropped, or postponed, and that the decision depends on checkpoint properties, current state/activity, queueing, and timing/capacity constraints [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java].
+- `CheckpointFailureReason` is a supporting anchor because the decider explicitly uses `MINIMUM_TIME_BETWEEN_CHECKPOINTS` and `TOO_MANY_CHECKPOINT_REQUESTS` as the failure outcomes for rejected requests [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointFailureReason.java].
+- The public docs that best frame the answer are the checkpointing guide, the checkpoints overview, and the backpressure note, since they explain when checkpointing happens and why scheduling/backlog matters [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpointing_under_backpressure/].
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java` is the direct neighboring regression test to inspect first [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java].
+- Existing coverage visible in retrieval system includes `testForce`, ordering checks, and branches that assert `chooseRequestToExecute` returns empty for dropped requests and that queued requests later become executable via `chooseQueuedRequestToExecute` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java].
+- If adding coverage, prioritize one test each for immediate execution, immediate drop with `MINIMUM_TIME_BETWEEN_CHECKPOINTS` or `TOO_MANY_CHECKPOINT_REQUESTS`, and postponed-then-dequeued execution under queue pressure [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java].
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpointing_under_backpressure/]
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java]
+- Supporting enum: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointFailureReason.java]
+- Neighboring test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java]
+
+**Uncertainties**
+- retrieved evidence was enough to confirm the three-way decision model and the failure reasons, but it did not expose full branch-by-branch logic in the implementation text, so I am not claiming exact predicate details beyond what the class and tests surface [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java].
+- retrieval system surfaced one clear neighboring test class; it did not enumerate additional adjacent test classes in this slice, so I would anchor the answer on `CheckpointRequestDeciderTest` unless you want me to expand the test search further.
+
+ANSWER B:
+**Recommendation**
+Anchor the explanation on the source Javadocs and the decider itself, then verify with the unit test matrix in `CheckpointRequestDeciderTest`.
+
+The scheduling rules in `CheckpointRequestDecider` are:
+
+- Queueing is priority-based, not pure FIFO.
+- Savepoints outrank checkpoints.
+- Forced requests outrank non-forced requests.
+- Non-periodic requests outrank periodic requests.
+- Older timestamps win within the same priority class, with `identityHashCode` as a final tie-breaker.
+- A new request is dropped immediately with `TOO_MANY_CHECKPOINT_REQUESTS` when the queue is already full of non-periodic requests.
+- If the queue is over capacity after insertion, the lowest-priority request is evicted and failed with `TOO_MANY_CHECKPOINT_REQUESTS`.
+- Execution is blocked while another trigger is already in progress, while the queue is empty, or while cleanup work is above the configured threshold.
+- When pending checkpoints have reached `maxConcurrentCheckpoints`, only a forced request may execute; otherwise the request stays queued.
+- Periodic, non-forced requests are additionally held back by `minPauseBetweenCheckpoints`; if the pause has not elapsed, that request is failed with `MINIMUM_TIME_BETWEEN_CHECKPOINTS` and the coordinator is asked to reschedule.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinator.java`
+- `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/api/environment/CheckpointConfig.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointFailureReason.java`
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java`
+  - Covers force priority, pending/backlog gating, queue size eviction, savepoint vs checkpoint ordering, periodic vs non-periodic ordering, and min-pause rescheduling.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTriggeringTest.java`
+  - Covers coordinator-level periodic triggering and min-pause behavior end to end.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreITCase.java`
+  - Covers the “too many cleaning checkpoints” backpressure path that the decider also consults.
+- If adding coverage, a focused test for “queue full but includes periodic requests, so the new non-periodic request should evict the periodic tail rather than fail immediately” would be the most useful missing edge case.
+
+**Citations**
+- Queueing and drop/evict logic: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:111`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:120`
+- Execution gating on trigger-in-progress, pending, and cleaning: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:152`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:160`
+- Min-pause reschedule path: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:167`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:176`
+- Priority comparator: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDecider.java:200`
+- Config docs for max concurrent checkpoints and min pause: `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java:416`, `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java:426`
+- Config docs for periodic interval and backlog interval: `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java:488`, `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java:511`
+- `CheckpointConfig` notes that interval triggering may be delayed by max-concurrent and min-pause: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/api/environment/CheckpointConfig.java:150`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/api/environment/CheckpointConfig.java:185`
+- Failure reasons used by the decider: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointFailureReason.java:25`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointFailureReason.java:27`
+- Unit coverage for priority and timing: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java:42`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java:104`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointRequestDeciderTest.java:177`
+- Coordinator integration around periodic scheduling and min pause: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTriggeringTest.java:105`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTriggeringTest.java:533`
+- Cleaning-backlog gating: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreITCase.java:343`
+
+**Uncertainties**
+- I did not find a separate rendered docs tree in this checkout, so the “version-pinned docs” here are the 2.2.0 source Javadocs in `CheckpointingOptions` and `CheckpointConfig`.
+- `CheckpointRequestDecider` is package-private, so most behavior is verified indirectly through package tests and coordinator integration tests rather than via a public API surface.

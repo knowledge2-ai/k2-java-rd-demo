@@ -1,0 +1,126 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-sink-connector-config
+TITLE: Kafka Connect pattern for SinkConnectorConfig
+QUESTION:
+For Kafka Connect 4.2.0, inspect `SinkConnectorConfig`: inspect sink connector-specific config validation. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the 4.2-pinned Connect docs plus the runtime implementation of `SinkConnectorConfig`. The key behavior to cover is sink-specific validation in `SinkConnectorConfig`, not generic connector config validation.
+
+**Implementation anchors**
+- `SinkConnectorConfig` is the primary implementation class to inspect for sink-specific config validation. The retrieved evidence shows it defines `configDef()`, `enrichedConfigDef(...)`, and constructor wiring, and its validation logic includes sink-specific checks such as requiring either `topics` or `topics.regex`, plus rejecting a DLQ topic that overlaps consumed topics. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SinkConnectorConfig.java]
+- For the surrounding validation flow, `AbstractHerder` is the runtime path that branches into sink connector-specific validation, so it is a useful cross-check when explaining where `SinkConnectorConfig` is used. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java]
+- Version-pinned docs that should anchor the explanation:
+  - Connector Development Guide for validation/config-def guidance. [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+  - Kafka Connect Configs for framework-level config context. [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+  - Kafka Connect landing page for the 4.2 doc set. [https://kafka.apache.org/42/kafka-connect/]
+
+**Tests to inspect or add**
+- Inspect `ConnectorValidationIntegrationTest` first; retrieval system surfaced an explicit sink validation test there: `testSinkConnectorHasNeitherTopicsListNorTopicsRegex()`, which is directly relevant to the `topics`/`topics.regex` validation rule. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+- Also inspect nearby connector-validation integration coverage in the same test class for other sink-specific rules, especially DLQ-related validation.
+- I did not get a direct `SinkConnectorConfigTest` hit from retrieval system, so if you expect unit coverage around this class, that looks like a gap to verify rather than assume.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+- Docs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+- Docs: [https://kafka.apache.org/42/kafka-connect/]
+- Impl: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SinkConnectorConfig.java]
+- Runtime path: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java]
+- Neighboring tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+
+**Uncertainties**
+- retrieval system surfaced the sink validation integration test, but not a dedicated `SinkConnectorConfigTest`; that may mean the relevant coverage is only integration-level, or it may just not have been indexed in this pass.
+- The evidence snippet for `SinkConnectorConfig` confirms the presence of sink-specific rules, but I did not fetch the full file, so if you need exhaustive rule-by-rule coverage, that should be verified directly from the class.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the `SinkConnectorConfig` validation path itself, then cross-check the generic connector config tests. For Kafka Connect 4.2.0, the sink-specific validation is expected to live in `SinkConnectorConfig`, not in connector implementations.
+
+**Implementation anchors**
+- Version-pinned docs: `https://kafka.apache.org/42/documentation.html` and the Connect config section within it.
+- Version-pinned Javadoc: `https://kafka.apache.org/42/javadoc/org/apache/kafka/connect/runtime/SinkConnectorConfig.html`
+- Implementation class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SinkConnectorConfig.java`
+- Neighboring base class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java`
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SinkConnectorConfigTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java`
+- If coverage is missing, add unit tests for the sink-specific validation branch that enforces the `topics` / `topics.regex` rules and any required cross-field constraints.
+
+**Citations**
+- Apache Kafka 4.2.0 docs: `https://kafka.apache.org/42/documentation.html`
+- Apache Kafka 4.2.0 Javadoc for `SinkConnectorConfig`: `https://kafka.apache.org/42/javadoc/org/apache/kafka/connect/runtime/SinkConnectorConfig.html`
+- Source class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SinkConnectorConfig.java`
+- Test class: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SinkConnectorConfigTest.java`
+
+**Uncertainties**
+- I cannot verify the exact 4.2.0 section anchor or whether `SinkConnectorConfigTest.java` exists in that release without repository/docs access.
+- I am confident about the package/class names and the likely validation area, but not about the exact method names or all sink-specific constraints in 4.2.0.

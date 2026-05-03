@@ -1,0 +1,139 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-rest-server-endpoint
+TITLE: Flink REST pattern for RestServerEndpoint
+QUESTION:
+For Flink REST API 2.2.0, inspect `RestServerEndpoint`: trace the abstract REST endpoint lifecycle. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Use `RestServerEndpoint` as the lifecycle contract and trace it in this order: constructor setup, `start()`, abstract `initializeHandlers(...)`, handler sorting/registration, Netty bootstrap and bind, `startInternal()`, then `closeAsync()` -> handler shutdown -> `shutDownInternal()`.
+- For a concrete 2.2.0 runtime anchor, follow `WebMonitorEndpoint` and `DispatcherRestEndpoint`, because they supply the real handler set and shutdown behavior exercised by the REST server.
+- For version-pinned docs, anchor on the docs generator pipeline in `flink-docs`, which emits per-version runtime REST docs from the `RuntimeRestAPIVersion` enum.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/RestServerEndpoint.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/dispatcher/DispatcherRestEndpoint.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java`
+- `repo://apache/flink@release-2.2.0/flink-docs/pom.xml`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java`
+- `repo://apache/flink@release-2.2.0/flink-docs/README.md`
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestExternalHandlersITCase.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerSSLAuthITCase.java`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointConfigurationTest.java`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/RestAPIDocGeneratorTest.java`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/OpenApiSpecGeneratorTest.java`
+
+**Citations**
+- `RestServerEndpoint` lifecycle methods are defined in `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/RestServerEndpoint.java`.
+- The concrete runtime subclass and handler composition are in `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java` and `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/dispatcher/DispatcherRestEndpoint.java`.
+- Version-pinned runtime docs generation is wired by `repo://apache/flink@release-2.2.0/flink-docs/pom.xml`, `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java`, and `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java`.
+- The docs policy for regenerating REST docs when handlers or message classes change is in `repo://apache/flink@release-2.2.0/flink-docs/README.md`.
+- The highest-signal lifecycle tests are `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java` and `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java`.
+
+**Uncertainties**
+- The generated REST docs themselves are not committed in this checkout, so I anchored on the generator code and `flink-docs/pom.xml` rather than a rendered markdown artifact.
+- `DocumentingDispatcherRestEndpoint` is test-only (`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/DocumentingDispatcherRestEndpoint.java`), so I treated it as a documentation harness, not the primary runtime implementation.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the versioned Flink REST docs for `release-2.2.0`, then trace the endpoint lifecycle in `RestServerEndpoint` itself, and finally validate behavior against the closest runtime REST tests.
+
+**Implementation anchors**
+- Version-pinned REST API docs: `flink/flink-docs-release-2.2/docs/ops/rest_api/index.html` for the general REST backend, versioning, and development guidance [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001].
+- Version-pinned SQL Gateway REST docs: `flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/index.html` for the REST endpoint-specific SQL Gateway flow [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/#part-0001].
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/RestServerEndpoint.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/RestServerEndpoint.java].
+- The code evidence confirms `RestServerEndpoint` is an abstract Netty-based REST server endpoint and exposes the lifecycle hook `initializeHandlers(...)` plus `start()` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/RestServerEndpoint.java].
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java` for core endpoint behavior and URL sorting [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java].
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/TestRestServerEndpoint.java` as the concrete test subclass of `RestServerEndpoint` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/TestRestServerEndpoint.java].
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/DocumentingRestEndpoint.java` as a neighboring fixture for endpoint/documentation-style behavior [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/DocumentingRestEndpoint.java].
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersionTest.java` for version-selection semantics in the REST API [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersionTest.java].
+- If you need stronger coverage, add a test that exercises the full `start()` path and asserts handler registration and versioned routing around a concrete `RestServerEndpoint` subclass.
+
+**Citations**
+- REST backend docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001]
+- SQL Gateway REST docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/#part-0001]
+- `RestServerEndpoint`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/RestServerEndpoint.java]
+- `RestServerEndpointTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointTest.java]
+- `TestRestServerEndpoint`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/TestRestServerEndpoint.java]
+- `DocumentingRestEndpoint`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/DocumentingRestEndpoint.java]
+- `RuntimeRestAPIVersionTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersionTest.java]
+
+**Uncertainties**
+- retrieval returned only a truncated excerpt of `RestServerEndpoint.java`, so I can confirm the abstract lifecycle hook and `start()` entrypoint, but not every internal step from the evidence alone.
+- The docs surfaced are for the broader REST backend and SQL Gateway REST endpoint, not a dedicated `RestServerEndpoint` class page, so lifecycle mapping to implementation details still needs direct source inspection if you want a full trace.

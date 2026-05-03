@@ -1,0 +1,131 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-submit-handler
+TITLE: Flink REST pattern for JobSubmitHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobSubmitHandler`: inspect job submission request handling. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the review on the 2.2.x REST API docs for job submission, then trace the handler’s request parsing, validation, and submission wiring in `JobSubmitHandler`.
+- Use the matching handler unit test as the executable spec, and compare it with nearby jar/submission handler tests for edge-case coverage.
+
+**Implementation anchors**
+- Docs: Flink 2.2.0 REST API docs for `POST /jobs/submit` in the `flink-docs-release-2.2` docs line.
+- Code: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandler.java`
+- Same area, if you need the request contract: `JobSubmitHeaders` and the request body type used by the handler.
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandlerTest.java`
+- Neighboring tests in the same package, especially:
+  - `JarUploadHandlerTest`
+  - `JarRunHandlerTest`
+- Add or extend coverage for:
+  - malformed submit payloads
+  - missing jar references
+  - invalid or duplicate parameters
+  - the happy path that proves the submission request is constructed and dispatched correctly
+
+**Citations**
+- `org.apache.flink.runtime.rest.handler.job.JobSubmitHandler` (`flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandler.java`)
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandlerTest.java`
+
+**Uncertainties**
+- I’m not fully certain of the exact versioned docs filename or URL for the 2.2.0 docs without browsing.
+
+ANSWER B:
+**Recommendation**
+Use the release-2.2.0 REST docs as the version anchor, then read the `JobSubmitHandler` implementation and its dedicated test first. retrieval system also surfaced the nearby job-handler test suite as the most relevant pattern source for this package. [REST API docs](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001) [REST API developing section](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002) [JobSubmitHandler](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandler.java) [JobSubmitHandlerTest](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandlerTest.java)
+
+**Implementation anchors**
+- Version-pinned docs: Flink REST API 2.2 release docs, especially the overview and “Developing” guidance for adding handlers. [REST API docs](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001) [Developing section](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002)
+- Implementation class: `org.apache.flink.runtime.rest.handler.job.JobSubmitHandler` in `flink-runtime`. [JobSubmitHandler](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandler.java)
+- Neighboring handler pattern: the docs explicitly point to the `WebMonitorEndpoint`/handler-registration model for REST endpoints. [Developing section](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002)
+
+**Tests to inspect or add**
+- Direct test: `JobSubmitHandlerTest`. [JobSubmitHandlerTest](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandlerTest.java)
+- Same-package neighbors to mine for conventions and edge cases:
+  - `JobConfigHandlerTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java)
+  - `JobDetailsHandlerTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java)
+  - `JobsOverviewHandlerTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobsOverviewHandlerTest.java)
+  - `JobStatusHandlerTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java)
+  - `JobExecutionResultHandlerTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExecutionResultHandlerTest.java)
+  - `SavepointHandlersTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java)
+  - `CheckpointHandlersTest` [source](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointHandlersTest.java)
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001)
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002)
+- Code: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandler.java](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandler.java)
+- Test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandlerTest.java](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobSubmitHandlerTest.java)
+
+**Uncertainties**
+- The retrieval system snippets for `JobSubmitHandler` and `JobSubmitHandlerTest` were truncated, so I can confirm the anchor files but not every request-handling branch or assertion from the bodies.
+- I did not get a specific neighboring test that directly targets submit-request validation beyond `JobSubmitHandlerTest`; the rest are package-adjacent pattern references.

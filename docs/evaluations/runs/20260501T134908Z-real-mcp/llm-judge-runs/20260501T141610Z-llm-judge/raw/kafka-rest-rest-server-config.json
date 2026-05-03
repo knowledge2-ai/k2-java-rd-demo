@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.98,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A names version-pinned Kafka 4.2 docs, the exact `RestServerConfig` implementation, and concrete neighboring tests, with explicit uncertainty. B is much weaker: it uses a generic `docs/connect.html`, omits version-pinned URLs, and hand-waves at sibling tests. For an engineer changing Java code, A is the safer and more actionable anchor set.",
+  "critical_issues": {
+    "A": [
+      "Does not verify the exact assertions inside `RestServerConfigTest`; it only identifies the file as the anchor."
+    ],
+    "B": [
+      "Uses generic `docs/connect.html` instead of version-pinned 4.2.0 docs or a concrete source URI.",
+      "Fails to name specific neighboring tests, only vague `RestServer*Test` coverage.",
+      "Admits uncertainty about the docs and test names, which is too weak for an anchoring answer."
+    ]
+  }
+}

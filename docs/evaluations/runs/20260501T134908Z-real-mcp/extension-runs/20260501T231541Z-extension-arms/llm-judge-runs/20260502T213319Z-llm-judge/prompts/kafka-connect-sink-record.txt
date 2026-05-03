@@ -1,0 +1,160 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-sink-record
+TITLE: Kafka Connect pattern for SinkRecord
+QUESTION:
+For Kafka Connect 4.2.0, inspect `SinkRecord`: inspect sink record metadata available to connectors. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the Kafka 4.2.0 source Javadocs as the version-pinned doc anchor, then ground the answer in the `SinkRecord` implementation and the runtime tests that prove what sink connectors actually receive.
+
+`SinkRecord` exposes:
+- inherited `ConnectRecord` data: `topic`, `kafkaPartition`, `key`, `value`, `timestamp`, `headers`
+- sink-specific metadata: `kafkaOffset()`, `timestampType()`
+- original Kafka metadata for offset tracking across SMTs: `originalTopic()`, `originalKafkaPartition()`, `originalKafkaOffset()`
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkRecord.java#L28-L35`
+  - Class-level Javadoc explicitly says the record includes original Kafka `topic`, `partition`, and `offset`, plus `TimestampType` and timestamp.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkRecord.java#L73-L178`
+  - Concrete accessors for `kafkaOffset`, `timestampType`, and the three `original*` methods.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/ConnectRecord.java#L28-L31`
+  - Base record fields shared with sinks: `topic`, `kafkaPartition`, `key`, `value`, `timestamp`, `headers`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java#L571-L590`
+  - Runtime construction path: `ConsumerRecord` is converted into `SinkRecord`, then wrapped as `InternalSinkRecord` so original consumer metadata survives transformations.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/InternalSinkRecord.java#L27-L58`
+  - Internal wrapper preserves original topic/partition/offset across `newRecord(...)` calls.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L1647-L1674`
+  - Verifies timestamp propagation and `timestampType`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L1765-L1791`
+  - Verifies headers are present on sink records.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L1850-L1873`
+  - Verifies `originalTopic()` is preserved when SMTs mutate topic names.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/InternalSinkRecordTest.java#L41-L69`
+  - Verifies `InternalSinkRecord` preserves headers and original topic/partition across `newRecord(...)`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskThreadedTest.java#L225-L239`
+  - Verifies the record handed to tasks matches an `InternalSinkRecord` with the expected metadata.
+- Optional connector-side usage example: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ErrantRecordSinkConnector.java#L61-L77`
+  - Shows a sink connector consuming `originalKafkaOffset()` in practice.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkRecord.java#L28-L35`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkRecord.java#L73-L178`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/ConnectRecord.java#L28-L31`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java#L571-L590`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/InternalSinkRecord.java#L27-L58`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L1647-L1674`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L1765-L1791`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L1850-L1873`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/InternalSinkRecordTest.java#L41-L69`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskThreadedTest.java#L225-L239`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ErrantRecordSinkConnector.java#L61-L77`
+
+**Uncertainties**
+- This checkout does not include a separate rendered `docs/` tree, so the most reliable version-pinned “docs” are the source Javadocs in `connect/api`.
+- The `SinkRecord` Javadoc still says the `original*` accessors were added in Kafka 3.6; that is historically correct, but the question here is anchored on the 4.2.0 source that still contains them.
+- I did not find a dedicated `connect/api` unit test for `SinkRecord` itself; the behavior is covered indirectly by runtime tests.
+
+ANSWER B:
+**Recommendation**
+Use the Kafka 4.2.0 Connect docs plus the `SinkRecord` API implementation as the primary anchors. For neighbor coverage, inspect `InternalSinkRecordTest` first; retrieval system did not surface a dedicated `SinkRecordTest`, so treat that gap explicitly.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Connector Development Guide: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001)
+  - Kafka Connect config docs for sink-record logging context: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0050](https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0050)
+- Implementation class:
+  - `SinkRecord` in the Kafka 4.2 branch: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkRecord.java`
+  - Related runtime wrapper: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/InternalSinkRecord.java`
+
+**Tests to inspect or add**
+- Existing neighboring test:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/InternalSinkRecordTest.java`
+- Also inspect:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java`
+- If you need direct coverage for sink metadata accessors, add a focused `SinkRecord` unit test because retrieval did not return one.
+
+**Citations**
+- [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001)
+- [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0050](https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0050)
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkRecord.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/InternalSinkRecord.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/InternalSinkRecordTest.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java`
+
+**Uncertainties**
+- retrieval system did not surface a dedicated `SinkRecordTest`, so test coverage for the public `SinkRecord` API may be indirect.
+- The returned code excerpt confirms the implementation location and class hierarchy, but not the full accessor list in the visible snippet; verify the full file if you need an exhaustive metadata-field inventory.

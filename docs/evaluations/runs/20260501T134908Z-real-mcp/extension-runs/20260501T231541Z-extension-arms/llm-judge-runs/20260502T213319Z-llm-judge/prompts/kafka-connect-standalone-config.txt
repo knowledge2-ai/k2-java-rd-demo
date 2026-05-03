@@ -1,0 +1,131 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-standalone-config
+TITLE: Kafka Connect pattern for StandaloneConfig
+QUESTION:
+For Kafka Connect 4.2.0, inspect `StandaloneConfig`: inspect standalone worker configuration behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Treat `StandaloneConfig` as a thin, standalone-mode-specific wrapper over `WorkerConfig`: it inherits the common worker settings and adds only `offset.storage.file.filename`.
+- For a 4.2.0 answer, anchor on the source Javadocs in the Kafka 4.2 checkout plus the runtime wiring in `ConnectStandalone`, since I did not find a checked-in rendered docs tree in this repository snapshot.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java#L24-L46`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L55-L57`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/cli/ConnectStandalone.java#L56-L65`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/cli/ConnectStandalone.java#L159-L176`
+
+**Tests to inspect or add**
+- Existing focused config test: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfigTest.java#L67-L89`
+- Offset store integration with standalone config: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/storage/FileOffsetBackingStoreTest.java#L76-L129`
+- Standalone metrics-context behavior: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/ConnectUtilsTest.java#L62-L75`
+- Worker override behavior exercised with `StandaloneConfig`: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1089-L1267`
+- REST server startup path with standalone config: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java#L249-L266`
+- If you want to strengthen coverage, add a direct test for missing `offset.storage.file.filename` failing config construction.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java#L24-L46`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L55-L57`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/cli/ConnectStandalone.java#L56-L65`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/cli/ConnectStandalone.java#L159-L176`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfigTest.java#L67-L89`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/storage/FileOffsetBackingStoreTest.java#L76-L129`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/ConnectUtilsTest.java#L62-L75`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1089-L1267`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java#L249-L266`
+
+**Uncertainties**
+- This checkout does not appear to include a separate rendered Kafka docs tree, so I could not verify a versioned HTML/manual page locally. The safest verified anchors here are the source Javadocs and tests above.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the 4.2.0 Kafka Connect user guide and config reference, then verify behavior in `StandaloneConfig` and its dedicated unit test. The key standalone-mode behavior in the docs is that Connect runs as a single process and has standalone-specific options such as `offset.storage.file.filename` [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001], [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0001].
+
+**Implementation anchors**
+- `StandaloneConfig` is the implementation class to inspect. It lives in `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java` and extends `WorkerConfig` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java].
+- The version-pinned docs to use are:
+  - Kafka Connect User Guide 4.2 [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001]
+  - Kafka Connect Configs 4.2 [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0001]
+  - Kafka Connect overview page 4.2 if you need the high-level mode split [https://kafka.apache.org/42/kafka-connect/]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfigTest.java` first; this is the direct neighboring test for the class [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfigTest.java].
+- If the behavior under question is not already covered there, add a regression test in that file for the specific standalone-only config path you care about. The retrieved evidence is incomplete on the exact assertions already present, so I would not claim coverage beyond the file’s existence without reading the test body.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001]
+- Docs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0001]
+- Docs: [https://kafka.apache.org/42/kafka-connect/]
+- Impl: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfigTest.java]
+
+**Uncertainties**
+- retrieval returned the implementation class and the neighboring test file, but not the full `StandaloneConfig` or `StandaloneConfigTest` bodies.
+- Because of that, I can anchor where to look, but I cannot safely state the exact validation rules or current test assertions without more source inspection.

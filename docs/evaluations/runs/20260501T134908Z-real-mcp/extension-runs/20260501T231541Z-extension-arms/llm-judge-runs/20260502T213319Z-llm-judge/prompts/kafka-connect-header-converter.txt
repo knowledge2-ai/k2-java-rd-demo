@@ -1,0 +1,138 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-header-converter
+TITLE: Kafka Connect pattern for HeaderConverter
+QUESTION:
+For Kafka Connect 4.2.0, inspect `HeaderConverter`: inspect header conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the answer on the default implementation, `SimpleHeaderConverter`, and on the worker/connector config docs that define `header.converter` plus the version-pinned `header.converter.plugin.version` knob.
+- If you need a direct regression test for header round-trip semantics, add one: there is no dedicated `SimpleHeaderConverterTest` in this checkout.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/HeaderConverter.java` defines the contract for `toConnectHeader(...)` / `fromConnectHeader(...)`.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/SimpleHeaderConverter.java` is the default header converter. It serializes to UTF-8 strings, parses inbound bytes with `Values.parseString(...)`, returns nulls through unchanged, and falls back to `Schema.BYTES_SCHEMA` on unexpected decode failures.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java` contains the worker-level docs for `header.converter` and `header.converter.plugin.version`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java` mirrors the connector-level docs and validators for the same header-converter settings.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java` is the version-aware instantiation path: when a header-converter version is present, it switches to plugin classloading and configures the converter.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java` for default header converter selection, explicit header converter loading, and config propagation.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginRecommenderTest.java` for header-converter version recommender coverage.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java` for versioned plugin loading and latest-version resolution.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` for invalid class/type/constructor/config validation around header converters.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectMetricsTest.java` for monitorable header-converter metric wrapping.
+- Add a dedicated `SimpleHeaderConverter` unit test if you want direct assertions for null handling, UTF-8 round-trip, parse fallback, and `DataException` paths.
+
+**Citations**
+- [HeaderConverter.java](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/HeaderConverter.java)
+- [SimpleHeaderConverter.java](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/SimpleHeaderConverter.java)
+- [WorkerConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java)
+- [ConnectorConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java)
+- [Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java)
+- [PluginsTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java)
+- [PluginRecommenderTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginRecommenderTest.java)
+- [MultiVersionTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java)
+- [ConnectorValidationIntegrationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java)
+- [ConnectMetricsTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectMetricsTest.java)
+
+**Uncertainties**
+- There is no dedicated `SimpleHeaderConverterTest` in this tree, so behavior is only indirectly covered by the neighboring tests above.
+- I did not find separate rendered docs files for this checkout; the authoritative version-pinned documentation is in the source config docstrings in `WorkerConfig` and `ConnectorConfig`.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the 4.2.0 Kafka Connect configuration docs for `header.converter`, the `HeaderConverter` interface itself, and the nearest test fixture that implements it. The docs establish the user-facing behavior; the interface establishes the contract; the test fixture shows a concrete implementation pattern.
+
+**Implementation anchors**
+- Docs: `header.converter` in the 4.2 Connect configs page says it is the `HeaderConverter` class used to convert between Kafka Connect format and the serialized form written to Kafka, and that by default `SimpleHeaderConverter` serializes header values to strings and deserializes them by inferring schemas. [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0048]
+- Docs: the MirrorMaker configs page also documents `header.converter` as the class that converts header values between Connect format and the serialized Kafka form. [https://kafka.apache.org/42/configuration/mirrormaker-configs/#part-0024]
+- Implementation class: `connect/api/src/main/java/org/apache/kafka/connect/storage/HeaderConverter.java` is the interface to cite for exact contract language; retrieval system shows it is specifically for `Headers`, is discoverable via Java `ServiceLoader`, and can implement `Monitorable` for metrics. [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/HeaderConverter.java]
+- Configuration wiring: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java` contains the `HEADER_CONVERTER_CLASS_VALIDATOR` and `HEADER_CONVERTER_VERSION_CONFIG`, showing Connect validates `HeaderConverter` subclasses and has a separate plugin-version knob. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SampleHeaderConverter.java`; retrieval system shows it implements `HeaderConverter` and `Versioned`, so it is the closest concrete neighbor for behavior and extension patterns. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SampleHeaderConverter.java]
+- retrieval system did not surface a dedicated `HeaderConverterTest` in the 4.2.0 evidence set. That is a gap, not a conclusion.
+- If adding coverage, target:
+  - serialization/deserialization round-trips for headers
+  - default `SimpleHeaderConverter` behavior around string serialization and schema inference
+  - `ServiceLoader` discoverability and config validation for `HeaderConverter` subclasses
+  - versioned plugin behavior via `header.converter.plugin.version`
+
+**Citations**
+- [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0048]
+- [https://kafka.apache.org/42/configuration/mirrormaker-configs/#part-0024]
+- [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/HeaderConverter.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SampleHeaderConverter.java]
+
+**Uncertainties**
+- The retrieved evidence is incomplete for dedicated regression tests: it did not return a `HeaderConverterTest` or a focused header-conversion regression suite.
+- I can confirm the contract and config wiring from the sources above, but I cannot claim exact runtime behavior beyond what the version-pinned docs and interface text state.

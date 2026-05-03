@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.89,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better anchored in concrete Flink 2.2.0 artifacts: it names the handler, headers class, repo paths, and neighboring tests, while explicitly noting uncertainty about a dedicated handler test. B is mostly speculative, with repeated \"likely\" wording and an unverified test anchor, so it is less reliable for engineering changes.",
+  "critical_issues": {
+    "A": [
+      "The `/v1/config` path may be imprecise; the answer should verify the exact REST endpoint fragment in the 2.2.0 docs."
+    ],
+    "B": [
+      "Uses speculative anchors like \"likely response model\" and \"likely companion header/spec class\" instead of verified source artifacts.",
+      "Cites a specific `DashboardConfigHandlerTest` without evidence it exists.",
+      "Does not give concrete neighboring tests or exact repo paths, reducing engineer usefulness."
+    ]
+  }
+}

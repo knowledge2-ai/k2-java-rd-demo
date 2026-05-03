@@ -1,0 +1,29 @@
+{
+  "winner": "A",
+  "confidence": 0.97,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 3,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A names the version-pinned 4.2 Javadocs and the actual connect/api implementation and test anchors that exist in Kafka, including SchemaBuilderTest and ConnectSchemaTest. B is less accurate: it relies on broader Connect docs, cites an unrelated integration test, and incorrectly claims SchemaBuilder-specific tests were not surfaced even though they exist.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Incorrectly says no SchemaBuilder-specific test was surfaced, but Kafka Connect has connect/api/src/test/java/org/apache/kafka/connect/data/SchemaBuilderTest.java and ConnectSchemaTest.java.",
+      "Anchors the answer on broad Connect landing/guide pages instead of the version-pinned SchemaBuilder Javadoc and nearby unit tests.",
+      "Includes an unrelated ExactlyOnceSourceIntegrationTest citation that does not support SchemaBuilder behavior."
+    ]
+  }
+}

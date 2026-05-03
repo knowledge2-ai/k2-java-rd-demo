@@ -1,0 +1,135 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-abstract-rest-handler
+TITLE: Flink REST pattern for AbstractRestHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `AbstractRestHandler`: implement a request handler with the correct response-body contract. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Implement the handler as a version-pinned Flink REST endpoint in `flink-runtime` using `AbstractRestHandler` and a concrete `ResponseBody` subtype. The 2.2.0 docs explicitly say new requests should be added by defining `MessageHeaders`, implementing a matching `AbstractRestHandler`, and registering it in `WebMonitorEndpoint#initializeHandlers()` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002].
+
+**Implementation anchors**
+- Version-pinned docs: REST API 2.2.0 overview and developer guidance [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java` in `release-2.2.0` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java]
+- Closest concrete example handler in the same module: `JobResourceRequirementsHandler` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobResourceRequirementsHandler.java]
+- Contract clue from the base type: `AbstractRestHandler` is the superclass for handlers that work with `RequestBody` and `ResponseBody` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java]
+
+**Tests to inspect or add**
+- Inspect `TestRestHandler` for the local test harness pattern around request/response handling [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/TestRestHandler.java]
+- Inspect `RestServerEndpointITCase` for endpoint wiring, request dispatch, and error-path behavior [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java]
+- Inspect `MultipartUploadExtension` if the new handler needs custom REST endpoint setup or extension registration [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/MultipartUploadExtension.java]
+- Add a focused regression test if none exists for your specific handler, especially one that asserts the concrete `ResponseBody` type returned by the handler
+
+**Citations**
+- REST API docs, 2.2.0: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001]
+- REST API developer guidance for adding handlers: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- Base implementation class: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java]
+- Concrete nearby handler: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobResourceRequirementsHandler.java]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/util/TestRestHandler.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/MultipartUploadExtension.java]
+
+**Uncertainties**
+- The retrieval did not surface a dedicated `AbstractRestHandlerTest`, so the exact response-body contract should be confirmed from the source before codifying it.
+- The `AbstractRestHandler` text returned by retrieval system was truncated, so I can anchor the type relationship to `RequestBody`/`ResponseBody`, but not quote every generic/constructor detail with full certainty.
+
+ANSWER B:
+**Recommendation**
+- Anchor the implementation on Flink’s REST handler contract: `AbstractRestHandler` should return a concrete `ResponseBody` type that matches the `MessageHeaders` declaration.
+- If the endpoint has no payload, use `EmptyResponseBody` rather than `null` or an ad hoc placeholder.
+- The safest mental model is: request in, typed response body out, with the handler’s declared response type being the source of truth.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Flink 2.2.0 REST API docs for the endpoint family you are touching.
+  - The 2.2.0 Javadocs for `AbstractRestHandler` and the related REST message types.
+- Implementation class:
+  - `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java`
+- Supporting type to check:
+  - `org.apache.flink.runtime.rest.messages.EmptyResponseBody`
+  - The handler’s `MessageHeaders` implementation, especially its declared response-body type.
+
+**Tests to inspect or add**
+- Inspect neighboring tests in:
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/`
+- Prefer tests that already cover:
+  - typed response serialization,
+  - empty-body responses,
+  - handler error paths and status codes.
+- If this is a new or changed concrete handler, add one focused test that asserts:
+  - the happy-path response body type matches the header contract,
+  - the no-content case returns `EmptyResponseBody` or the equivalent expected contract.
+
+**Citations**
+- I can’t provide verified external citations without browsing in this run.
+- Exact source anchors I would use, if you want to verify locally, are the file paths above in the Flink 2.2.0 source tree.
+
+**Uncertainties**
+- I am not fully certain of the exact neighboring test class names without inspecting the tree.
+- I am also not fully certain whether the specific endpoint should return a domain DTO or `EmptyResponseBody`; that depends on the concrete `MessageHeaders` contract for the handler you are implementing.

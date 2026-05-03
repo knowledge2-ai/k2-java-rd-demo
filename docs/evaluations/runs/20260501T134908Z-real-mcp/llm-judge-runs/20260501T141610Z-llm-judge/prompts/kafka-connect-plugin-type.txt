@@ -1,0 +1,122 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugin-type
+TITLE: Kafka Connect pattern for PluginType
+QUESTION:
+For Kafka Connect 4.2.0, inspect `PluginType`: inspect plugin type classification. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka Connect plugin-classification path in `connect/runtime/isolation`, not on higher-level Connect docs alone. For Kafka Connect 4.2.0, the safest framing is that `PluginType` is the classification layer used during plugin discovery/isolation to decide whether a class is a connector, converter, header converter, transformation, predicate, or similar Connect plugin category. If you are writing or reviewing behavior, treat the implementation as the source of truth and use tests to confirm the expected mapping for representative classes.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java`
+- Closely related discovery/isolation code in the same package, especially anything that calls into `PluginType` during scanning or metadata creation
+- If the question is about how classification is surfaced to users, also inspect the Connect plugin docs for the 4.2.0 release branch, especially the plugin-path / plugin-loading section in the Connect documentation set
+
+**Tests to inspect or add**
+- Neighboring unit tests under:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/`
+- Look for tests covering:
+  - class-to-type classification for connectors, converters, transforms, predicates, and config providers
+  - edge cases for abstract classes, interfaces, or non-plugins
+  - behavior when a class matches more than one plugin category or when classification is ambiguous
+- If coverage is thin, add a focused test matrix for `PluginType` that asserts each supported Connect plugin category maps correctly from a representative implementation class
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/`
+- Kafka Connect 4.2.0 documentation in the Connect plugin-loading / plugin-path section
+
+**Uncertainties**
+- I am not certain of the exact 4.2.0 documentation filename without browsing.
+- I am also not certain whether `PluginType` in 4.2.0 classifies exactly the same set of categories as later Kafka releases; the package path above is the right anchor, but the enum members may differ slightly by version.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Kafka 4.2-pinned Connect docs plus the runtime isolation enum/class itself. The strongest doc anchor is the 4.2 Connect user guide section that describes plugin manifests and the expected plugin superclasses, and the implementation anchor is `PluginType` in Connect runtime isolation. If you need behavior proof for versioned plugin classification, use the neighboring isolation test coverage; retrieval system surfaced `MultiVersionTest` as the closest test anchor. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040] [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java] [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+
+**Implementation anchors**
+- Version-pinned docs: Kafka Connect 4.2 user guide plugin manifest section, which lists the plugin superclass categories expected to have manifests and explains how Connect classifies discoverable plugins. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040]
+- Version-pinned docs: Kafka Connect 4.2 connector development guide for the surrounding plugin/developer model. [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Implementation class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java` in the `apache/kafka@4.2` tree. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java` for versioned plugin loading and plugin-type coverage. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+- I did not get a dedicated `PluginTypeTest` result from retrieval system, so if the repo lacks one, add a focused unit test for the classification matrix in `PluginType`. The retrieved evidence is incomplete on that point.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040]
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+
+**Uncertainties**
+- The returned retrieved evidence did not expose the body of `PluginType.java`, so I cannot state the exact enum values or classification rules from this run without guessing.
+- retrieval system did not surface a dedicated `PluginTypeTest`, so test anchoring is currently indirect via `MultiVersionTest`.

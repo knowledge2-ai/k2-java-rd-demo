@@ -1,0 +1,135 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-source-connector-config
+TITLE: Kafka Connect pattern for SourceConnectorConfig
+QUESTION:
+For Kafka Connect 4.2.0, inspect `SourceConnectorConfig`: inspect source connector-specific config validation. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the generated Connect config docs for `SourceConnectorConfig`, then use the implementation class plus the herder-level validation tests. In Kafka Connect 4.2.0, the config schema lives in `SourceConnectorConfig`, while the extra source-connector preflight checks are enforced by `DistributedHerder`.
+
+**Implementation anchors**
+- `SourceConnectorConfig` is the source of truth for source-connector config definitions, including topic-creation group validation, `exactly.once.support`, `transaction.boundary`, `transaction.boundary.interval.ms`, and `offsets.storage.topic`.
+- The docs are generated from `SourceConnectorConfig.main()` via `genSourceConnectorConfigDocs`, which writes `docs/generated/source_connector_config.html` from this 4.2.0 source tree.
+- `AbstractHerder.validateSourceConnectorConfig(...)` is the base validation path.
+- `DistributedHerder.validateSourceConnectorConfig(...)` adds the source-specific runtime checks for exactly-once support and connector-defined transaction boundaries.
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceConnectorConfigTest.java` for direct `SourceConnectorConfig` validation, especially topic-creation defaults, duplicate/invalid group handling, and topic property passthrough.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` for end-to-end preflight validation of duplicate `topic.creation.groups`.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java` for exactly-once and transaction-boundary validation behavior and error messages.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java` for integration coverage of the same source-specific validation paths.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/util/TopicCreationTest.java` if you need behavioral coverage around how validated topic-creation config is consumed.
+
+**Citations**
+- [build.gradle](repo://apache/kafka@4.2/build.gradle)
+- [SourceConnectorConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceConnectorConfig.java)
+- [AbstractHerder.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java)
+- [DistributedHerder.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java)
+- [SourceConnectorConfigTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceConnectorConfigTest.java)
+- [ConnectorValidationIntegrationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java)
+- [DistributedHerderTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java)
+- [ExactlyOnceSourceIntegrationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java)
+- [TopicCreationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/TopicCreationTest.java)
+
+**Uncertainties**
+- I did not find a checked-in `docs/generated/source_connector_config.html` file in this checkout; the docs are generated by the Gradle task, so the stable anchor here is the generator in `build.gradle` plus `SourceConnectorConfig.main()`.
+- If you want the narrowest runtime-validation story, `DistributedHerderTest` is the key neighboring test file; `SourceConnectorConfigTest` mostly covers the config-def/topic-creation side rather than the herder preflight checks.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Kafka 4.2.0 Connect docs for connector validation, then on `SourceConnectorConfig` itself, and finally on its dedicated unit test plus the closest integration validation test.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page: `https://kafka.apache.org/42/kafka-connect/` [https://kafka.apache.org/42/kafka-connect/]
+  - Connector Development Guide, especially the config validation section: `https://kafka.apache.org/42/kafka-connect/connector-development-guide/` [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019]
+  - Kafka Connect configs reference: `https://kafka.apache.org/42/configuration/kafka-connect-configs/` [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+- Implementation class:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceConnectorConfig.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceConnectorConfig.java]
+- Runtime call site that applies source-connector-specific validation:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java]
+
+**Tests to inspect or add**
+- Primary neighboring unit test:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceConnectorConfigTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceConnectorConfigTest.java]
+- Nearby integration coverage for connector validation:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+- Adjacent source-connectors integration coverage that may expose config/offset side effects:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/], [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019], [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceConnectorConfig.java], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java]
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceConnectorConfigTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- The retrieved evidence clearly surfaced `SourceConnectorConfigTest`, but it did not enumerate specific test methods or assertions inside that class.
+- The docs evidence is version-pinned and relevant, but retrieval did not return the exact section text for `SourceConnectorConfig`-specific validation, so I would treat the guide/config pages as anchors rather than proof of one exact behavior.

@@ -1,0 +1,19 @@
+You are Codex in a controlled evaluation WITH a real K2 stdio MCP server.
+Do not run shell commands. Do not browse. Before answering, call the available K2 MCP tool `k2_answer_with_sources` with exactly these arguments:
+- query: "For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?"
+- framework: "kafka"
+- api_surface: "connect"
+- top_k: 8
+Use the returned K2 evidence for exact implementation claims and cite source_uri values inline in brackets. If the K2 evidence is incomplete, state the gap instead of guessing.
+Follow the tool's answer_style and preferred_sources fields when present.
+Answer style: match a strong local `rg`/file-read answer. Start with the concrete implementation class/file and behavior, not a docs overview. Prefer code/test anchors over docs for implementation questions. Use at most 5 implementation bullets, at most 4 test bullets, and cite only the sources you actually use. Do not mention K2, MCP, retrieval internals, scores, filters, or tool calls in the final answer. Put missing evidence only in the Uncertainties section.
+
+Customer question:
+For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+Return a concise engineering answer with these headings:
+Recommendation
+Implementation anchors
+Tests to inspect or add
+Citations
+Uncertainties

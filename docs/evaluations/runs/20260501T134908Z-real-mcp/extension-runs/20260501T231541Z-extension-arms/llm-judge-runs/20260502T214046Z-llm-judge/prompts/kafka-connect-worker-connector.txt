@@ -1,0 +1,149 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-worker-connector
+TITLE: Kafka Connect pattern for WorkerConnector
+QUESTION:
+For Kafka Connect 4.2.0, inspect `WorkerConnector`: inspect connector startup and failure handling. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use source-level Javadocs as the version-stable docs for Kafka Connect 4.2.0 here. This checkout does not contain a separate checked-in `docs/` tree, so the best anchors are:
+- the lifecycle contract in `Connector.java`
+- the connector runtime policy in `WorkerConnector.java`
+- the worker-level startup path in `Worker.java`
+- the focused and integration tests in `WorkerConnectorTest` and `WorkerTest`
+
+**Implementation anchors**
+- `WorkerConnector` is the class that owns connector lifecycle state, startup, failure, and shutdown behavior. Its class Javadoc explicitly says connector failures are fatal and restart is via the REST API, and `initialize()`, `doStart()`, `onFailure()`, `doTransitionTo()`, `doShutdown()`, and `WorkerConnectorContext.raiseError()` are the key methods to read. `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L44-L55` `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L154-L239` `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L256-L322` `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L378-L395` `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L591-L595`
+- `Connector.java` is the API contract that frames startup and recovery semantics, especially `initialize(...)` and `start(...)`. `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java#L51-L97`
+- `Worker.startConnector()` is the caller that constructs `WorkerConnector` and converts constructor/start failures into status failures. `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L300-L355`
+
+**Tests to inspect or add**
+- `WorkerConnectorTest` already covers the core cases you want for startup/failure behavior: init failure, failure finality, normal startup, startup failure, shutdown failure, and invalid connector type. `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L118-L166` `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L171-L255` `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L382-L441` `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L540-L556`
+- `WorkerTest` is the neighboring integration coverage for worker-level connector startup and startup failure handling. `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L320-L423`
+- If you want one extra regression beyond what exists today, add a test for the async `ConnectorContext.raiseError(...)` path, since that is the other failure ingress into `WorkerConnector` and is not called out by name in the current test list. `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L591-L595`
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java#L51-L97`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L44-L55`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L154-L239`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L256-L322`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L378-L395`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java#L591-L595`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L300-L355`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L118-L166`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L171-L255`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L382-L441`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java#L540-L556`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L320-L423`
+
+**Uncertainties**
+- I did not find a separate checked-in versioned docs tree in this Kafka 4.2 snapshot, so the anchors above are source Javadocs plus tests rather than an external markdown/asciidoc page.
+- If you want the answer tied to a public docs page instead of source docs, that would need a different source than this local checkout.
+
+ANSWER B:
+**Recommendation**
+Use the Kafka 4.2.0 docs as the public anchor, then ground the implementation on `WorkerConnector` and its direct unit test coverage. The strongest evidence points to `WorkerConnector.initialize()` for startup and the state-transition path for failure handling, with `WorkerConnectorTest` as the primary regression anchor.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page [https://kafka.apache.org/42/kafka-connect/]
+  - Connector Development Guide [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+  - User Guide [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001]
+- Implementation class:
+  - `WorkerConnector` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java]
+- Behavior to inspect in that class:
+  - Startup entry path around `initialize()`
+  - State transition / failure callback path around `transitionTo(...)`
+  - The class-level responsibility is lifecycle management, including startup and shutdown [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java]
+
+**Tests to inspect or add**
+- Direct unit anchor:
+  - `WorkerConnectorTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java]
+- Specific cases surfaced by retrieval system:
+  - `testFailConnectorThatIsNeitherSourceNorSink(...)` in `WorkerConnectorTest` for startup validation/failure routing
+  - `testStopFailure(...)` in `WorkerConnectorTest` for failure handling during lifecycle transitions
+- Neighboring runtime integration reference:
+  - `ExactlyOnceSourceIntegrationTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+- If you add coverage, target:
+  - startup failure propagation when connector type is invalid
+  - callback behavior when state transitions are pre-empted or fail
+  - stop/retry failure handling
+
+**Citations**
+- [https://kafka.apache.org/42/kafka-connect/]
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001]
+- [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- retrieval returned the correct version-pinned anchors, but not line-precise excerpts for every startup/failure branch inside `WorkerConnector`, so I’m not claiming exact control-flow details beyond the class and the surfaced methods.
+- `ExactlyOnceSourceIntegrationTest` is adjacent runtime coverage, but the evidence does not prove it directly exercises the same `WorkerConnector` startup path.

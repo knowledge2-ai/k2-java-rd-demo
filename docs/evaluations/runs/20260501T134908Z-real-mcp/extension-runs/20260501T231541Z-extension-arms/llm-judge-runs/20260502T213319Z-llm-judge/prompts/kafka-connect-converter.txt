@@ -1,0 +1,127 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-converter
+TITLE: Kafka Connect pattern for Converter
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the Kafka 4.2.0 Connect docs for the public contract, then anchor the implementation discussion in `ConnectorConfig.java`, because that is where `key.converter` and `value.converter` are defined and validated. For behavior-specific claims about actual conversion, retrieval did not return the concrete `Converter` implementation, so do not infer beyond the config wiring.
+
+**Implementation anchors**
+- Public docs home for Kafka Connect 4.2.0: [https://kafka.apache.org/42/kafka-connect/]
+- Version-pinned config reference for `key.converter` and `value.converter`: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0002] and [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0047]
+- Code anchor: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+
+**Tests to inspect or add**
+- Existing neighboring integration test: `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+- Inspect the converter validation cases there, especially missing/invalid converter class coverage.
+- Add or verify a regression test that separately exercises `key.converter` vs `value.converter` selection and ensures the worker does not cross-wire them.
+
+**Citations**
+- Kafka Connect 4.2 docs landing page: [https://kafka.apache.org/42/kafka-connect/]
+- Config docs for `value.converter`: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- Config docs for `key.converter`: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0002]
+- Config docs showing `key.converter.plugin.version` / `value.converter.plugin.version`: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0047]
+- Implementation anchor: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+- Neighboring test anchor: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+
+**Uncertainties**
+- retrieved evidence did not return the actual `org.apache.kafka.connect.storage.Converter` interface or a concrete converter class that directly demonstrates key-vs-value conversion behavior.
+- The returned evidence is enough to anchor the config contract and validation path, but not enough to make exact claims about the conversion algorithm itself without a follow-up search.
+
+ANSWER B:
+**Recommendation**
+Use the `Converter` interface as the API contract, but anchor the key/value behavior on the runtime wiring and the versioned config docs, not on the interface alone. The most useful concrete implementation anchor is `StringConverter`, with `NumberConverter` and `ByteArrayConverter` as sibling examples.
+
+**Implementation anchors**
+- `Converter` defines the split surface: `configure(Map, boolean isKey)`, plus separate `fromConnectData`/`toConnectData` methods and header-aware overloads.
+- `WorkerConfig` and `ConnectorConfig` carry the version-pinned docs for both key and value converters via `key.converter.plugin.version` / `value.converter.plugin.version`.
+- `Plugins.newConverter(...)` is where Connect decides key vs value by config name and passes `isKey` into the converter.
+- `StringConverter` is the clearest concrete example of key/value handling: it maps `isKey` into `converter.type` and then configures the serializer/deserializer accordingly.
+- `NumberConverter` follows the same pattern for numeric converters; `ByteArrayConverter` is the pass-through counterexample and ignores key/value distinction.
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/converters/NumberConverterTest.java` and the concrete number tests (`LongConverterTest`, `DoubleConverterTest`, etc.) for round-trip, null, and type-mismatch behavior.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/converters/ByteArrayConverterTest.java` for schemaless bytes, invalid schema/type, and `ByteBuffer` handling.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java` and `WorkerSourceTaskTest.java` for source-side key vs value serialization paths.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java` for sink-side key vs value deserialization and plugin wrapping.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java` and `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java` for versioned key/value converter loading from connector vs worker configs.
+
+**Citations**
+- `Converter` contract: [Converter.java](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java#L28-L98)
+- Version-pinned key/value converter docs: [WorkerConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L74-L94), [ConnectorConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L97-L122)
+- Key/value dispatch and versioned loading: [Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java#L457-L476)
+- Concrete converter behavior: [StringConverter.java](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/StringConverter.java#L33-L83), [NumberConverter.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/NumberConverter.java#L37-L93), [ByteArrayConverter.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/ByteArrayConverter.java#L33-L67)
+- Neighboring tests: [NumberConverterTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/NumberConverterTest.java#L33-L113), [ByteArrayConverterTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/ByteArrayConverterTest.java#L37-L121), [AbstractWorkerSourceTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java#L249-L257), [WorkerSourceTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L249-L257), [WorkerSinkTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L214-L229), [WorkerTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L968-L1008), [MultiVersionTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L261-L290)
+
+**Uncertainties**
+- I did not find a separate generated docs tree in this checkout, so the best “version-pinned docs” anchors here are the source Javadocs and config definitions in `WorkerConfig` and `ConnectorConfig`.
+- There is no single universal converter implementation for all key/value cases; behavior depends on the concrete converter (`StringConverter`, number converters, byte-array converter, JSON/Avro converters, etc.).

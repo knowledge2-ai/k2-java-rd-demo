@@ -1,0 +1,20 @@
+**Recommendation**
+Anchor the answer on the Kafka 4.2 Connect docs for plugin manifests and compatibility, then ground the behavior in the `PluginScanResult` implementation and the scanner test coverage. The best fit from K2 is the 4.2 Kafka Connect landing page and Connector Development Guide, plus the user guide section that describes plugin manifests and compatibility rules [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/) [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/) [https://kafka.apache.org/42/kafka-connect/user-guide/](https://kafka.apache.org/42/kafka-connect/user-guide/)
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java` is the core result holder for scan output; it aggregates sorted sets for sink connectors, source connectors, converters, header converters, transformations, predicates, config providers, REST extensions, and connector client config override policies [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java]
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java` owns the `scanResult` field and initializes it through `initLoaders(...)`, so it is the surrounding entry point for plugin scanning flow [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java` first; it already covers empty directories, invalid JARs only, and no-plugin cases, which are the closest neighboring scanner behaviors [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java]
+- I did not find a dedicated `PluginScanResultTest` in the K2 evidence, so if you need direct coverage for `PluginScanResult` itself, that test likely needs to be added.
+- If you want stronger regression coverage, add assertions for how each plugin category is populated in the returned `PluginScanResult`, not just that scanning completes or returns empty.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/), [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/), [https://kafka.apache.org/42/kafka-connect/user-guide/](https://kafka.apache.org/42/kafka-connect/user-guide/)
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java), [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java)
+- Neighboring tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java)
+
+**Uncertainties**
+- The K2 evidence did not surface a dedicated `PluginScanResultTest`, so I cannot claim one exists.
+- The docs surfaced by K2 are version-pinned to 4.2, but the evidence here is broad; if you need the exact subsection for manifest compatibility, I would anchor on the user guide and connector development guide rather than the top-level landing page.

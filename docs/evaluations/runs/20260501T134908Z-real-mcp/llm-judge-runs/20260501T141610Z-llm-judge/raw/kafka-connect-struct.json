@@ -1,0 +1,32 @@
+{
+  "winner": "B",
+  "confidence": 0.91,
+  "scores": {
+    "A": {
+      "correctness": 2,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 2,
+      "risk": 2
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    }
+  },
+  "rationale": "B is closer to the actual Kafka Connect 4.2.0 validation surface: `Struct`, `ConnectSchema`, `SchemaBuilderTest`, and `StructTest` are the right anchors. A’s versioned docs are good, but its test guidance is mis-anchored to unrelated integration tests and incorrectly implies no Struct-specific test exists, which reduces trust.",
+  "critical_issues": {
+    "A": [
+      "Uses unrelated integration tests (`ConnectorValidationIntegrationTest`, `ExactlyOnceSourceIntegrationTest`) instead of the real neighboring unit tests for Struct validation.",
+      "Claims no Struct-specific test was surfaced, but `connect/api/src/test/java/org/apache/kafka/connect/data/StructTest.java` exists.",
+      "Misses the most relevant adjacent tests: `ConnectSchemaTest` and `SchemaBuilderTest`."
+    ],
+    "B": [
+      "Does not give exact 4.2.0 doc URLs, only stable class-name anchors.",
+      "Could mention `ValuesTest` as another adjacent validation test because Struct validation flows through Connect data validation helpers."
+    ]
+  }
+}

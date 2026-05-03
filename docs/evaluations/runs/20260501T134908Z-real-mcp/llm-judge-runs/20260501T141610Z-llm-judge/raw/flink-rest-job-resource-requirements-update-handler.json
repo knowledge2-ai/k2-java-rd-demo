@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.78,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A anchors the right Flink 2.2.0 docs, the exact `JobResourceRequirementsUpdateHandler`, and feature-adjacent tests for resource-requirements. B drifts to generic job-handler tests and adds unsupported “retrieval system” claims. A is still slightly uncertain about the exact DTO/test names, but it is closer to the relevant API surface and safer for implementation work.",
+  "critical_issues": {
+    "A": [
+      "It hedges on the DTO/test names instead of confirming them from source.",
+      "It may overstate the existence of `JobResourceRequirementsUpdateHandlerTest.java` without verification."
+    ],
+    "B": [
+      "It replaces feature-specific neighboring tests with generic job handler tests that are not the right anchor.",
+      "It introduces unsupported meta-claims about retrieval rather than source-backed evidence.",
+      "Its cited docs fragments (`part-0032`, `part-0002`) are less directly useful than naming the actual endpoint section and related feature tests."
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-cluster-overview-handler
+TITLE: Flink REST pattern for ClusterOverviewHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `ClusterOverviewHandler`: inspect cluster overview response construction. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Flink 2.2.0 REST API docs for `/overview` and the `ClusterOverviewHandler` implementation in `flink-runtime`. The docs define the expected response shape, and the handler is the code path that builds `ClusterOverviewWithVersion` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0048] [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java].
+
+**Implementation anchors**
+- `ClusterOverviewHandler` is the primary implementation class to inspect for response construction; it extends `AbstractRestHandler<RestfulGateway, EmptyRequestBody, ClusterOverviewWithVersion, EmptyMessageParameters>` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java].
+- `ClusterOverviewHeaders` is the adjacent message-headers anchor for the same endpoint and response type [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/ClusterOverviewHeaders.java].
+- The version-pinned REST docs for `/overview` specify the response fields: `flink-commit`, `flink-version`, job counts, slot counts, and taskmanager counts [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0048].
+
+**Tests to inspect or add**
+- No direct `ClusterOverviewHandlerTest` surfaced in the retrieved evidence, so there is a coverage gap.
+- Inspect nearby REST handler tests in the same module/package for style and assertions:
+  - `JobManagerLogListHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerLogListHandlerTest.java]
+  - `JobManagerCustomLogHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerCustomLogHandlerTest.java]
+- If you add coverage, a dedicated test for `ClusterOverviewHandler` should assert the response fields and version metadata match the docs.
+
+**Citations**
+- REST docs for `/overview`: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0048]
+- Handler implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java]
+- Message headers: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/ClusterOverviewHeaders.java]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerLogListHandlerTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerCustomLogHandlerTest.java]
+
+**Uncertainties**
+- retrieval did not return a direct `ClusterOverviewHandlerTest`, so I cannot cite a handler-specific regression test.
+- The docs evidence is enough to anchor the endpoint contract, but not enough to prove every field is constructed in exactly one place without reading the handler body itself.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the runtime REST API v1 docs and the concrete handler path. In Flink 2.2.0, `/overview` is served by `ClusterOverviewHandler`, which fetches a base `ClusterOverview` from the gateway and wraps it into `ClusterOverviewWithVersion` by injecting the build version and commit id.
+
+**Implementation anchors**
+- Version-pinned REST docs: `RuntimeRestAPIDocGenerator` generates the runtime docs only for `RuntimeRestAPIVersion.V1`; `V0` is test-only. That is the doc-version anchor for 2.2.0. [`repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java`](repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java), [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java)
+- REST endpoint contract: `ClusterOverviewHeaders` declares `GET /overview`, response type `ClusterOverviewWithVersion`, and the human-readable description. [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/ClusterOverviewHeaders.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/ClusterOverviewHeaders.java)
+- Response construction: `ClusterOverviewHandler` calls `gateway.requestClusterOverview(timeout)` and then `ClusterOverviewWithVersion.fromStatusOverview(statusOverview, version, commitID)`. [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java`](repo://apache/flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java)
+- Payload shape: `ClusterOverviewWithVersion` copies all base overview counters and adds `flink-version` and `flink-commit`. [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersion.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersion.java)
+- Handler wiring: `WebMonitorEndpoint` registers `ClusterOverviewHandler` with `ClusterOverviewHeaders.getInstance()`. [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java`](repo://apache/flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java)
+
+**Tests to inspect or add**
+- Existing serialization/round-trip coverage for the versioned payload: `ClusterOverviewWithVersionTest`. [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersionTest.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersionTest.java)
+- Existing message-level coverage for the base overview model: `WebMonitorMessagesTest` includes generic marshalling for `ClusterOverview`. [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/messages/WebMonitorMessagesTest.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/messages/WebMonitorMessagesTest.java)
+- Docs generator tests that pin the versioned REST-doc machinery: `RestAPIDocGeneratorTest` and `OpenApiSpecGeneratorTest`. [`repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/RestAPIDocGeneratorTest.java`](repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/RestAPIDocGeneratorTest.java), [`repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/OpenApiSpecGeneratorTest.java`](repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/OpenApiSpecGeneratorTest.java)
+- If you want direct handler coverage, add a dedicated `ClusterOverviewHandlerTest` for two cases: it forwards the gateway overview fields unchanged, and it stamps the version/commit from `EnvironmentInformation`.
+
+**Citations**
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java`](repo://apache/flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/cluster/ClusterOverviewHandler.java)
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/ClusterOverviewHeaders.java`](repo://apache/flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/ClusterOverviewHeaders.java)
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersion.java`](repo://apache/flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersion.java)
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java`](repo://apache/flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java)
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java`](repo://apache-flink-release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java)
+- [`repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java`](repo://apache/flink-release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java)
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersionTest.java`](repo://apache-flink-release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/legacy/messages/ClusterOverviewWithVersionTest.java)
+- [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/messages/WebMonitorMessagesTest.java`](repo://apache-flink-release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/messages/WebMonitorMessagesTest.java)
+- [`repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/RestAPIDocGeneratorTest.java`](repo://apache-flink-release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/RestAPIDocGeneratorTest.java)
+- [`repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/OpenApiSpecGeneratorTest.java`](repo://apache-flink-release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/OpenApiSpecGeneratorTest.java)
+
+**Uncertainties**
+- I did not find a checked-in rendered REST doc page in this checkout; the version-pinned anchor here is the generator/test path, not a generated HTML artifact.
+- There is no dedicated `ClusterOverviewHandlerTest` in `flink-runtime/src/test/java` in this checkout, so handler behavior is only indirectly covered today.

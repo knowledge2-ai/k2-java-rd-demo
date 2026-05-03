@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.95,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 1,
+      "grounding": 3,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A correctly centers Kafka Connect 4.2.0 on `Worker` and names the expected runtime neighbors and unit tests. B misanchors the answer on `AbstractHerder` instead of `Worker`, and its integration-test recommendation is not the right neighboring test surface for tracing worker lifecycle responsibilities. A is slightly less precise on docs, but materially more aligned with the question.",
+  "critical_issues": {
+    "A": [
+      "Docs anchor is broad (`/documentation/`) rather than the more relevant version-pinned Connect pages or javadocs.",
+      "Does not cite concrete source evidence for the lifecycle claims, only file paths."
+    ],
+    "B": [
+      "Uses `AbstractHerder` as the implementation anchor even though the question explicitly asks to inspect `Worker`.",
+      "Treats a nearby integration test as the main test anchor instead of `WorkerTest`, `WorkerSinkTaskTest`, and `WorkerSourceTaskTest`.",
+      "Overstates uncertainty by claiming the source system did not surface `Worker`, which is not a reliable substitute for the asked anchor."
+    ]
+  }
+}

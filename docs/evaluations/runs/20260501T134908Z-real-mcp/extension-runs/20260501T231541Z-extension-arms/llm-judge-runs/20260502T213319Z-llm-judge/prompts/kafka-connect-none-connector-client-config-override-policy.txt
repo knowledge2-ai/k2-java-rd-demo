@@ -1,0 +1,142 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-none-connector-client-config-override-policy
+TITLE: Kafka Connect pattern for NoneConnectorClientConfigOverridePolicy
+QUESTION:
+For Kafka Connect 4.2.0, inspect `NoneConnectorClientConfigOverridePolicy`: inspect policy behavior when overrides are not allowed. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs as the public anchor, then validate behavior in `NoneConnectorClientConfigOverridePolicy` and its base test class. For the “overrides not allowed” case, the key expectation is that the policy rejects connector-side client config overrides rather than permitting any passthrough. The retrieved evidence supports the class/test locations, but the returned snippet did not include the full method body or assertion text, so I would treat the exact rejection path as a code-level verification step rather than a sourced claim.
+
+**Implementation anchors**
+- Docs:
+  - Kafka Connect user guide, security section: `https://kafka.apache.org/42/kafka-connect/user-guide/#part-0041` [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0041]
+  - Kafka Connect configs reference: `https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040` [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- Implementation:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicy.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicy.java]
+  - Its shared base, `AbstractConnectorClientConfigOverridePolicy.java`, is the right adjacent implementation to inspect for the common deny/validate flow [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+
+**Tests to inspect or add**
+- Existing direct test:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java]
+- Neighboring policy tests that establish the surrounding contract:
+  - `BaseConnectorClientConfigOverridePolicyTest` (superclass of the None policy test, per retrieved evidence in the test file) [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java]
+  - `PrincipalConnectorClientConfigOverridePolicyTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java]
+  - `AllowlistConnectorClientConfigOverridePolicy.java` for the opposite policy shape and its “empty allowlist means no overrides” behavior [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicy.java]
+- If adding coverage, I would add/strengthen a test that asserts:
+  - a connector-supplied override is rejected under `NoneConnectorClientConfigOverridePolicy`
+  - the rejection is consistent for both producer and consumer client configs, if that is part of the base contract
+  - the policy remains the default-deny implementation even when connected through the shared abstract base
+
+**Citations**
+- Kafka Connect user guide 4.2: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0041]
+- Kafka Connect configs 4.2: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- `NoneConnectorClientConfigOverridePolicy`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicy.java]
+- `AbstractConnectorClientConfigOverridePolicy`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+- `NoneConnectorClientConfigOverridePolicyTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java]
+- `PrincipalConnectorClientConfigOverridePolicyTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java]
+- `AllowlistConnectorClientConfigOverridePolicy`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicy.java]
+
+**Uncertainties**
+- The retrieval system response identified the right files, but it did not return the full implementation body or the full test methods, so I could not source the exact rejection method/result string.
+- I did not get a direct excerpt from the docs section that names `connector.client.config.override.policy=none`; the docs anchors are correct, but the exact wording should be rechecked in the cited pages if you need a verbatim doc statement.
+
+ANSWER B:
+**Recommendation**
+- Treat `NoneConnectorClientConfigOverridePolicy` as a deny-all policy. It accepts an empty override map, but any requested client override is rejected during validation.
+- The rejection is per config key, with the shared message shape: `The 'None' policy does not allow '<key>' to be overridden in the connector configuration.`
+
+**Implementation anchors**
+- Versioned Connect config docs are generated from `DistributedConfig` via `build.gradle`’s `genConnectConfigDocs` task, which writes `connect_config.html`: `repo://apache/kafka@4.2/build.gradle#L3664-L3668`
+- The user-facing config doc for `connector.client.config.override.policy` is in `WorkerConfig.CONNECTOR_CLIENT_POLICY_CLASS_DOC`, which says `None` disallows overrides and `All` is the default: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L159-L166`
+- The API contract for validation is in `ConnectorClientConfigOverridePolicy` Javadoc: validation happens before connector startup, and any policy violation blocks startup: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java#L26-L39`
+- The concrete deny-all implementation is `NoneConnectorClientConfigOverridePolicy`, which returns `false` from `isAllowed(...)` for every config and logs that overrides are disallowed: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicy.java#L27-L47`
+
+**Tests to inspect or add**
+- `NoneConnectorClientConfigOverridePolicyTest` is the direct unit anchor: it asserts empty overrides pass and a map with `SaslConfigs.SASL_JAAS_CONFIG` plus `ProducerConfig.ACKS_CONFIG` fails: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java#L28-L49`
+- `BaseConnectorClientConfigOverridePolicyTest` is the shared harness that turns a client-config map into a `ConnectorClientConfigRequest` and checks for per-entry error messages: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java#L29-L59`
+- The sibling policy tests are useful context for expected behavior differences: `AllowlistConnectorClientConfigOverridePolicyTest` and `PrincipalConnectorClientConfigOverridePolicyTest`: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicyTest.java#L32-L75` and `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java#L28-L49`
+- `WorkerTest` is the runtime enforcement anchor: it verifies `None` causes `Worker.baseConsumerConfigs(...)` and `Worker.adminConfigs(...)` to throw `ConnectException` when connector overrides are present: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1208-L1222` and `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1255-L1267`
+- If you add coverage, the highest-value assertion is the exact denial text per override key, not just “some error exists”.
+
+**Citations**
+- `repo://apache/kafka@4.2/build.gradle#L3664-L3668`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L159-L166`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java#L26-L39`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicy.java#L27-L47`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java#L29-L59`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java#L28-L49`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicyTest.java#L32-L75`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java#L28-L49`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1208-L1222`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1255-L1267`
+
+**Uncertainties**
+- The rendered versioned docs page itself is not checked into this repo, so I can only anchor the answer to the doc generation task and the source Javadocs/config strings that feed it, not to a built HTML artifact.

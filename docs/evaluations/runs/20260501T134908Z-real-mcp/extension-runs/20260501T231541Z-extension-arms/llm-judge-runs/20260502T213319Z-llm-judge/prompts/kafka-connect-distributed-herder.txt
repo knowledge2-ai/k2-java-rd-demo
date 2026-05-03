@@ -1,0 +1,145 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-distributed-herder
+TITLE: Kafka Connect pattern for DistributedHerder
+QUESTION:
+For Kafka Connect 4.2.0, inspect `DistributedHerder`: inspect distributed connector config update behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the 4.2-pinned Kafka Connect docs plus `DistributedHerder` itself, then verify behavior against `DistributedHerderTest`. The retrieved evidence shows `DistributedHerder` is the distributed coordinator for Connect workers, and that rebalance handling is funneled through the work thread rather than executed directly in callbacks [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java].
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page for 4.2: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Connector Development Guide for 4.2: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+  - Kafka Connect configs for 4.2: [https://kafka.apache.org/42/configuration/kafka-connect-configs/](https://kafka.apache.org/42/configuration/kafka-connect-configs/)
+- Implementation class:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java]
+- Behavior to anchor:
+  - The herder participates in group membership, the coordinator assigns work, and `DistributedHerder` runs the assigned connectors/tasks in a `Worker`.
+  - Rebalance handling is deferred into the main work loop, not executed in the callback path [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java].
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java` as the direct neighboring test anchor [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java].
+- Add or locate a focused regression around distributed connector config update handling in `DistributedHerderTest`, because the returned test evidence only surfaced request-ordering coverage, not config-update-specific assertions [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java].
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- Docs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/](https://kafka.apache.org/42/configuration/kafka-connect-configs/)
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java]
+
+**Uncertainties**
+- The retrieved evidence did not return the exact config-update method or a config-update-specific test case inside `DistributedHerderTest`.
+- I can confirm the structural anchor points, but not the precise update path semantics without a narrower source lookup on `DistributedHerder`’s update-related methods.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the source Javadocs and `DistributedHerder` implementation in the 4.2.0 tree, not on a separate docs page. The key behavior is: `onConnectorConfigUpdate()` treats an update as a local restart if the connector already exists, but treats it as a rebalance if the connector is newly added; task config updates still force rebalance.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/cli/ConnectDistributed.java#L45-L53` for the distributed-mode entrypoint and herder wiring.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java#L126-L151` for the class-level contract.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java#L612-L739` for the update handling split:
+  - eager vs incremental cooperative handling,
+  - rebalance on `needsReconfigRebalance`,
+  - local connector restart in `processConnectorConfigUpdates()`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java#L2409-L2460` for `ConfigUpdateListener.onConnectorConfigUpdate()` and `onTaskConfigUpdate()`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/storage/KafkaConfigBackingStore.java#L86-L146` for the config-log semantics: connector configs are atomic; task configs require buffering/commit logic.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L1550-L1665`
+  - `testConnectorConfigAdded()`
+  - `testConnectorConfigDetectedAfterLeaderAlreadyAssigned()`
+  - `testConnectorConfigUpdate()`
+  - `testConnectorConfigUpdateFailedTransformation()`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L2051-L2079`
+  - `testTaskConfigAdded()` for the rebalance-only path on task config changes.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L2397-L2433`
+  - `putConnectorConfig(...)` flow showing an update can restart the connector without rebalance.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L3422-L3468`
+  - `testPollDurationOnSlowConnectorOperations()` for timing/restart behavior during config updates.
+- If adding coverage, add a case for `processConnectorConfigUpdates()` skipping a connector that is no longer locally owned.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/cli/ConnectDistributed.java#L45-L53`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java#L126-L151`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java#L612-L739`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java#L2409-L2460`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/storage/KafkaConfigBackingStore.java#L86-L146`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L1550-L1665`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L2051-L2079`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L2397-L2433`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java#L3422-L3468`
+
+**Uncertainties**
+- I did not find a separate checked-in `docs/` tree in this Kafka 4.2.0 checkout, so the safest version-pinned anchors are the source Javadocs and tests above.
+- I did not run the test suite; this is a source-level inspection only.

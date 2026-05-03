@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.68,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 3,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better aligned to the ask: it anchors on `WorkerSinkTask`, cites the relevant 4.2.0 source/test files, and names the most plausible neighboring tests for sink delivery/commit behavior. B is more precise on links, but it drifts into likely unsupported internal method names and cites irrelevant integration tests, increasing hallucination risk.",
+  "critical_issues": {
+    "A": [
+      "Docs are not pinned to a single canonical 4.2.0 Connect page URL.",
+      "`WorkerSinkTaskThreadedTest` is plausible but not verified as the best neighboring anchor."
+    ],
+    "B": [
+      "Likely unsupported internal anchors: `recordBatch(...)`, `recordCommitSuccess(...)`, and `getNextCommit()` may not exist on `WorkerSinkTask`.",
+      "The extra integration tests are not direct neighbors for sink delivery/commit behavior.",
+      "Docs are less clearly the canonical 4.2.0 Connect contract pages than a direct version-pinned docs reference."
+    ]
+  }
+}

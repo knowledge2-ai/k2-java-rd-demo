@@ -1,0 +1,157 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-sink-connector
+TITLE: Kafka Connect pattern for SinkConnector
+QUESTION:
+For Kafka Connect 4.2.0, inspect `SinkConnector`: inspect sink connector implementation responsibilities. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the 4.2 source Javadocs in `connect/api/src/main/java/org/apache/kafka/connect/sink/` and the runtime offset-handling code in `WorkerConnector` and `Worker`. In Kafka Connect 4.2.0, `SinkConnector` is responsible for the connector lifecycle and topic/config declaration, plus optional offset alter/reset validation or propagation; Connect itself owns the consumer-group offset mutations and REST plumbing.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/package-info.java` `#L17-L20`
+  - Package-level API doc: “implementing sink connectors which write Kafka records to external applications.”
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java` `#L24-L83`
+  - Primary sink-connector contract:
+    - `TOPICS_CONFIG`
+    - `context()` cast to `SinkConnectorContext`
+    - `alterOffsets(...)` contract, including idempotency, pre-`start()` callability, and `@since 3.6`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java` `#L189-L203` and `#L604-L605`
+  - Sink connectors are initialized with `SinkConnectorContext`; source connectors get offset storage reader plumbing instead.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java` `#L1395-L1459` and `#L1764-L1772`
+  - Runtime path for sink offset alter/reset:
+    - parse/normalize offsets
+    - call `SinkConnector.alterOffsets(...)`
+    - use Kafka `Admin` to alter/delete consumer-group offsets
+    - return different success messages depending on whether the connector overrides `alterOffsets`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorOffset.java` `#L23-L38`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorOffsets.java` `#L28-L52`
+  - REST payload shape for sink offset alter/reset requests.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java` `#L118-L170`
+  - Verifies sink/source initialization and lifecycle behavior.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java` `#L2333-L2703`
+  - Best unit-level coverage for sink offset alter/reset, timeout, and error handling.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/OffsetsApiIntegrationTest.java` `#L328-L444` and `#L706-L828`
+  - End-to-end REST coverage for sink offset alter/reset, overridden consumer group IDs, and zombie-task scenarios.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/SinkConnectorsIntegrationTest.java` `#L54-L205`
+  - Good neighbor for sink assignment/commit behavior under different consumer assignment strategies.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/TestableSinkConnector.java` `#L43-L94`
+  - Concrete test connector showing the minimal sink implementation plus an `alterOffsets` override.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/BlockingConnectorTest.java` `#L763-L806`
+  - Useful for blocked-start/blocked-stop sink behavior and offset-operation timeout paths.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/package-info.java`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorOffset.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorOffsets.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/OffsetsApiIntegrationTest.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/SinkConnectorsIntegrationTest.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/TestableSinkConnector.java`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/BlockingConnectorTest.java`
+
+**Uncertainties**
+- I did not find a separate checked-in `docs/` tree in this snapshot, so I anchored on the source Javadocs/package docs that are versioned with Kafka 4.2.0.
+- I did not inspect generated website docs; if you need public-facing prose, the closest in-repo source of truth is the Javadoc in `SinkConnector.java` plus the REST entity docs in `ConnectorOffset(s)`.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the 4.2-pinned Kafka Connect docs plus the `SinkConnector` API source. The docs should frame `SinkConnector` as the sink-side connector plugin type, while the code anchor should be `connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java` [https://kafka.apache.org/42/kafka-connect/connector-development-guide/], [https://kafka.apache.org/42/kafka-connect/user-guide/], [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java].
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Connector Development Guide for Kafka Connect 4.2.0 [https://kafka.apache.org/42/kafka-connect/connector-development-guide/].
+  - Kafka Connect User Guide section that lists `org.apache.kafka.connect.sink.SinkConnector` as an expected plugin manifest type [https://kafka.apache.org/42/kafka-connect/user-guide/].
+- Implementation class:
+  - `org.apache.kafka.connect.sink.SinkConnector` in `connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java].
+- Responsibility framing from the surrounding Connect API:
+  - Connectors are responsible for creating task configs and reacting to changes that require reconfiguration via the runtime context [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java].
+
+**Tests to inspect or add**
+- retrieval system did not surface a SinkConnector-specific regression test.
+- The nearest surfaced neighboring test was `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`, but it is source-oriented and only useful as adjacent Connect runtime context, not direct SinkConnector coverage [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java].
+- If you need direct coverage for `SinkConnector`, add or locate a sink-specific test under `connect/runtime/src/test/java/org/apache/kafka/connect/...` that verifies plugin loading, task config generation, and reconfiguration behavior.
+
+**Citations**
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+- [https://kafka.apache.org/42/kafka-connect/user-guide/]
+- [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java]
+- [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- The retrieved evidence did not return the full `SinkConnector` class body, so I am not claiming specific overridden methods or internal logic from that file.
+- No sink-specific neighboring test was surfaced, so the test anchor is incomplete for direct `SinkConnector` behavior.

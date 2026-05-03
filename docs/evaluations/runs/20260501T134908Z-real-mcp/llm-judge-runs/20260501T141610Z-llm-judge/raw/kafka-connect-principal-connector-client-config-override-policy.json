@@ -1,0 +1,30 @@
+{
+  "winner": "A",
+  "confidence": 0.94,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 2
+    }
+  },
+  "rationale": "A is version-specific and anchored to the right Kafka 4.2 docs, the exact `PrincipalConnectorClientConfigOverridePolicy` class, and the adjacent test/base-test structure. B is too generic, cites a non-pinned docs page, and drifts to broader policy classes and speculative test coverage. A also explicitly notes uncertainty and deprecation, which matches the source surface better.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Uses a generic, non-version-pinned docs anchor instead of Kafka 4.2-specific documentation.",
+      "Omits the exact `PrincipalConnectorClientConfigOverridePolicy` implementation anchor as the primary class of interest.",
+      "Mentions sibling tests and per-client behavior speculatively without grounding in the 4.2 source surface.",
+      "Misses the concrete neighboring base test that is the key shared fixture for this policy family."
+    ]
+  }
+}

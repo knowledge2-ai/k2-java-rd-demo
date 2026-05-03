@@ -1,0 +1,145 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-subtask-current-attempt-details-handler
+TITLE: Flink REST pattern for SubtaskCurrentAttemptDetailsHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `SubtaskCurrentAttemptDetailsHandler`: inspect subtask-attempt details routing. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the routing discussion on the Flink 2.2.0 REST API docs entry for subtask execution-attempt details, then verify behavior in `SubtaskCurrentAttemptDetailsHandler` and its dedicated test. The endpoint documented in 2.2.0 is `GET /jobs/:jobid/vertices/:vertexid/subtasks/:subtaskindex/attempts/:attempt`, which returns details for a specific execution attempt [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0043] [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0042].
+
+**Implementation anchors**
+- Version-pinned REST docs: `flink/flink-docs-release-2.2/docs/ops/rest_api/index.html` with the subtask-attempt endpoint and response schema [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0042] [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0043].
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandler.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandler.java].
+- The handler is in the `org.apache.flink.runtime.rest.handler.job` package and is the concrete class to inspect for routing/attempt-details behavior [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandler.java].
+
+**Tests to inspect or add**
+- Direct neighbor test: `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java].
+- Same-package handler tests that are good routing/shape references:
+  - `JobDetailsHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java].
+  - `JobConfigHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java].
+- If you are adding coverage, mirror the direct handler test and add a route/mapping assertion for the `attempts/:attempt` path plus a response-shape assertion for `SubtaskExecutionAttemptDetailsInfo`.
+
+**Citations**
+- REST API docs and endpoint schema: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0042]
+- REST API docs and endpoint path: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0043]
+- Implementation class: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandler.java]
+- Direct test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java]
+
+**Uncertainties**
+- The retrieved evidence surfaced the implementation class and the direct test, but not the exact handler registration site in `WebMonitorEndpoint#initializeHandlers()`. If you need the full routing chain, that registration point should be verified separately.
+- I did not get a dedicated routing test name beyond `SubtaskCurrentAttemptDetailsHandlerTest`; if you want stricter route-level coverage, it likely needs to be added rather than just inspected.
+
+ANSWER B:
+**Recommendation**
+Treat `SubtaskCurrentAttemptDetailsHandler` as the V1 runtime REST route for the current/latest subtask execution attempt:
+
+- `GET /jobs/:jobid/vertices/:vertexid/subtasks/:subtaskindex`
+- It is the non-attempt-numbered sibling of `.../attempts/:attempt`
+- The docs anchor should be the generated V1 runtime REST API artifact, which is produced from the runtime REST headers and emitted as `rest_v1_dispatcher.html` by the docs build
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/SubtaskCurrentAttemptDetailsHeaders.java#L39`  
+  Defines the route, `GET`, response type, and description. The URL intentionally stops at `/subtasks/:subtaskindex`, so this is the “current/latest attempt” route, not the attempt-specific route.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandler.java#L47`  
+  Implements the lookup via `executionVertex.getCurrentExecutionAttempt()` and collects concurrent current executions.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L603`  
+  Registers the handler in the REST endpoint wiring.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/SubtaskMessageParameters.java#L28`  
+  Confirms this route only carries job, vertex, and subtask path params.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/SubtaskAttemptMessageParameters.java#L27`  
+  The neighboring attempt-specific route adds `SubtaskAttemptPathParameter`, which is the key contrast.
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java#L57`  
+  Primary handler test for current/latest-attempt behavior.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskExecutionAttemptDetailsHandlerTest.java#L60`  
+  Neighboring attempt-numbered route test; useful baseline for routing and payload differences.
+- Add a `SubtaskCurrentAttemptDetailsHeadersTest` if you want direct coverage of URL/verb/message-parameter wiring; I did not find one in this checkout.
+- For docs-generation sanity, `repo://apache/flink@release-2.2.0/flink-docs/src/test/java/org/apache/flink/docs/rest/RestAPIDocGeneratorTest.java#L27` is the nearby docs test to inspect.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L69`
+- `repo://apache/flink@release-2.2.0/flink-docs/pom.xml#L35`
+- `repo://apache/flink@release-2.2.0/flink-docs/pom.xml#L282`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/SubtaskCurrentAttemptDetailsHeaders.java#L39`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandler.java#L47`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L603`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/SubtaskMessageParameters.java#L28`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/SubtaskAttemptMessageParameters.java#L27`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java#L57`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskExecutionAttemptDetailsHandlerTest.java#L60`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/executiongraph/ExecutionVertex.java#L82`
+
+**Uncertainties**
+- The version-pinned docs artifact is generated, not checked in here; I verified the generator and build wiring, not the rendered HTML output itself.
+- There is no dedicated `SubtaskCurrentAttemptDetailsHeadersTest` in the current tree, so header/route assertions would need to be added if you want that coverage.

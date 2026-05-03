@@ -1,0 +1,135 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-config-value
+TITLE: Kafka Connect pattern for ConfigValue
+QUESTION:
+For Kafka Connect 4.2.0, inspect `ConfigValue`: explain validation result representation. Which version-pinned docs and implementation class should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "clients"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the Kafka Connect 4.2 version-pinned docs for semantics and `ConfigValue` for the implementation anchor. The validation result is represented as a `ConfigValue` carrying the config `name`, current `value`, `recommendedValues`, `errorMessages`, and `visible` flag; Connect validation code mutates that object by adding error messages and recommended values rather than returning a separate result type [https://kafka.apache.org/42/kafka-connect/] [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019] [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigValue.java]
+
+**Implementation anchors**
+- Docs: Kafka Connect 4.2 landing page and Connector Development Guide, both pinned to `42` [https://kafka.apache.org/42/kafka-connect/] [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019]
+- Implementation class: `org.apache.kafka.common.config.ConfigValue` in `clients/src/main/java/.../ConfigValue.java` [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigValue.java]
+- Nearby validation flow: `AbstractConnectorClientConfigOverridePolicy.validate(...)` builds `ConfigValue` objects and returns a `List<ConfigValue>` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+
+**Tests to inspect or add**
+- Inspect `BaseConnectorClientConfigOverridePolicyTest` for how `List<ConfigValue>` is asserted in validation paths [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java]
+- Inspect `ExactlyOnceSourceIntegrationTest` for how validation errors are surfaced through `ConfigValue.errorMessages()` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+- Add a focused unit test for `ConfigValue` representation if one is missing: verify `errorMessages`, `recommendedValues`, and `toString()` reflect validation outcomes
+
+**Citations**
+- Kafka Connect docs: [https://kafka.apache.org/42/kafka-connect/]
+- Connector Development Guide: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0019]
+- `ConfigValue`: [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigValue.java]
+- Validation flow: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+- Test coverage: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java] [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- The retrieved evidence did not surface a dedicated `ConfigValueTest`; I found nearby validation tests, but not a direct unit test for `ConfigValue` itself.
+- The evidence confirms representation and usage, but not a formal public contract beyond the docs and class structure.
+
+ANSWER B:
+**Recommendation**
+For Kafka Connect 4.2.0, treat `ConfigValue` as the validation-result carrier, not as a boolean status object. A validated config is represented by:
+
+- `name`
+- `value`
+- `recommendedValues`
+- `errorMessages`
+- `visible`
+
+The key rule is: **validation failures are encoded as one or more strings in `errorMessages`**. An empty `errorMessages` list means the value validated cleanly. In Connect’s REST layer, that object is projected into `ConfigValueInfo`, where the errors become the JSON field `errors` and `recommendedValues` becomes `recommended_values`.
+
+**Implementation anchors**
+- Version-pinned validation docs: [`clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java`](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java)
+- Connect policy docs: [`connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java`](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java)
+- Core implementation class: [`clients/src/main/java/org/apache/kafka/common/config/ConfigValue.java`](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigValue.java)
+- REST projection used by Connect: [`connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConfigValueInfo.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConfigValueInfo.java)
+- Conversion into REST response: [`connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java)
+
+**Tests to inspect or add**
+- Inspect: [`connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java) for `ConfigInfos`/`ConfigValueInfo` mapping and `errorCount`
+- Inspect: [`connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java) for the exact `ConfigValueInfo` shape
+- Inspect: [`connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java) for the `errorMessages`-driven validity check
+- Add if needed: a focused test asserting that `ConfigValue.errorMessages()` maps 1:1 to `ConfigValueInfo.errors` and that `ConfigInfos.error_count` increments per errored config
+
+**Citations**
+- [`ConfigValue.java`](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigValue.java)
+- [`ConfigDef.java`](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/ConfigDef.java)
+- [`ConnectorClientConfigOverridePolicy.java`](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java)
+- [`ConfigValueInfo.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConfigValueInfo.java)
+- [`AbstractHerder.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java)
+- [`AbstractHerderTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java)
+- [`ConnectorPluginsResourceTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java)
+- [`BaseConnectorClientConfigOverridePolicyTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java)
+
+**Uncertainties**
+- This checkout does not include a separate published docs tree, so the safest version-pinned anchors are the 4.2 source Javadocs and implementation classes above.
+- If you need the exact public REST schema text as shipped in generated HTML docs, that would need a docs artifact outside this source tree.

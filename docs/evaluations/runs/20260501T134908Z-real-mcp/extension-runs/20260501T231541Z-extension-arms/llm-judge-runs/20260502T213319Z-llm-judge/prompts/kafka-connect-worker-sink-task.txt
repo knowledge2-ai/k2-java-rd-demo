@@ -1,0 +1,158 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-worker-sink-task
+TITLE: Kafka Connect pattern for WorkerSinkTask
+QUESTION:
+For Kafka Connect 4.2.0, inspect `WorkerSinkTask`: inspect sink task delivery and commit behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Use the version-pinned Connect API Javadocs as the contract anchor: `SinkTask` for delivery/flush/pre-commit semantics and `SinkTaskContext` for `requestCommit()` and offset control. In this checkout, there is no standalone `docs/` tree to cite, so the source Javadocs are the release-specific docs.
+- Treat `WorkerSinkTask` as the implementation anchor for the actual sink delivery and commit behavior, and pair it with the sink-task unit tests that already encode the expected edge cases.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkTask.java:27-52,91-140,172-179` for the contract:
+  - `put()` delivery
+  - `flush()` / `preCommit()` offset safety
+  - `stop()` after final commit
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkTaskContext.java:25-97` for runtime hints:
+  - `offset(...)`
+  - `timeout(...)`
+  - `requestCommit()`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java:237-261` for the main loop:
+  - commit timing
+  - commit-request handling
+  - commit timeout handling
+  - poll-after-commit ordering
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java:279-314` for commit completion:
+  - async callback ordering
+  - out-of-order callback suppression
+  - last-committed offset updates
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java:377-500` for commit execution:
+  - sync vs async commit
+  - `preCommit()` filtering
+  - rewind-on-failure
+  - skip when no offsets changed
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java:622-815` for record delivery and rebalance behavior:
+  - `task.put(...)`
+  - redelivery pause/resume
+  - offset tracking from consumed records
+  - partition open/close/rewind on rebalance
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:978-1046` — `testRequestCommit`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:1069-1118` — `testPreCommit`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:1122-1152` — `testPreCommitFailure`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:1155-1192` — `testIgnoredCommit`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:1194-1246` — `testLongRunningCommitWithoutTimeout`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:1368-1576` — `testCommitWithOutOfOrderCallback`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:345-470` — `testShutdown` and `testPollRedelivery`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:475-550` — `testPollRedeliveryWithConsumerRebalance`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskThreadedTest.java:245-420` — `testCommit`, `testCommitFailure`, `testCommitTimeout`
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkTask.java:27-52,91-140,172-179`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkTaskContext.java:25-97`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java:237-261,279-314,377-500,622-815`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java:345-470,475-550,978-1046,1069-1152,1155-1246,1368-1576`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskThreadedTest.java:245-420`
+
+**Uncertainties**
+- I did not find a separate versioned docs site tree in this checkout, so I anchored on the API Javadocs that ship with Kafka 4.2.0 source.
+- If you want the narrowest regression set, the minimum useful trio is `testRequestCommit`, `testPreCommit`, and `testCommitWithOutOfOrderCallback`; the threaded tests add coverage for the worker-thread variant.
+
+ANSWER B:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs for the public contract, then anchor the behavior discussion in `WorkerSinkTask` itself and `WorkerSinkTaskTest`. The implementation class is the primary source for sink delivery/commit mechanics, especially the `recordBatch(...)` and `recordCommitSuccess(...)` overrides and the test-visible `getNextCommit()` hook [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java].
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page for 4.2: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Connector Development Guide for 4.2: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- Runtime implementation:
+  - `WorkerSinkTask`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java]
+- Nearby API surface:
+  - `SinkTask`: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkTask.java]
+
+**Tests to inspect or add**
+- Primary neighboring test:
+  - `WorkerSinkTaskTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java]
+- Adjacent tests surfaced by retrieval system, but they are not as directly on-point for sink delivery/commit:
+  - `ConnectorValidationIntegrationTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+  - `ExactlyOnceSourceIntegrationTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/), [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java]
+- Core test anchor: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java]
+- Adjacent tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- retrieval system surfaced `WorkerSinkTaskTest` as the direct neighboring test anchor, but did not return a deeper test inventory specifically centered on sink delivery/commit paths.
+- The evidence snippet for `WorkerSinkTask` confirms the relevant overrides, but retrieval did not return the full method bodies here, so any finer-grained behavioral claim should be verified directly in that class before stating it as fact.

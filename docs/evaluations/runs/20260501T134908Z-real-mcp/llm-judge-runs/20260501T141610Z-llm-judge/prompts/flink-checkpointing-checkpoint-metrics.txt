@@ -1,0 +1,146 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-checkpoint-metrics
+TITLE: Flink checkpointing pattern for CheckpointMetrics
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CheckpointMetrics`: identify checkpoint metric fields used by reporting code. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the release-2.2.0 docs plus the `CheckpointMetrics` implementation and its direct checkpointing call sites. The reporting path in retrieval system passes `CheckpointMetrics` through task/runtime acknowledgement APIs rather than exposing a separate reporting DTO, so the safest field list is the one defined on the class itself [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001], [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java].
+
+**Implementation anchors**
+- `CheckpointMetrics` in `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java` is the implementation class to cite [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java].
+- Reporting/acknowledgement call sites that carry the metrics object:
+  - `TaskStateManager.reportTaskStateSnapshots(...)` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/TaskStateManager.java]
+  - `Environment.acknowledgeCheckpoint(...)` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/execution/Environment.java]
+  - `CheckpointResponder.acknowledgeCheckpoint(...)` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/taskmanager/CheckpointResponder.java]
+- The metric fields surfaced in the `CheckpointMetrics` implementation snippet are:
+  - `bytesProcessedDuringAlignment`
+  - `bytesPersistedDuringAlignment`
+  - `alignmentDurationNanos`
+  - `syncDurationMillis`
+  - `asyncDurationMillis`
+  - `checkpointStartDelayNanos`
+  - `unalignedCheckpoint`
+  - `bytesPersistedOfThisCheckpoint`
+  - `totalBytesPersisted`
+  [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java]
+
+**Tests to inspect or add**
+- Primary neighbor: `CheckpointMetricsTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetricsTest.java]
+- Nearby checkpointing tests that exercise the same reporting/ack path:
+  - `TestTaskStateManager` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/state/TestTaskStateManager.java]
+  - `CheckpointCoordinatorTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java]
+  - `NoOpCheckpointResponder` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/taskmanager/NoOpCheckpointResponder.java]
+- If you need a regression guard, add a test that asserts the full metric set is preserved across the reporting/acknowledgement path, not just construction/serialization [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetricsTest.java].
+
+**Citations**
+- Docs:
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpointing_under_backpressure/#part-0001]
+- Code:
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java]
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/TaskStateManager.java]
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/execution/Environment.java]
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/taskmanager/CheckpointResponder.java]
+- Tests:
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetricsTest.java]
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/state/TestTaskStateManager.java]
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java]
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/taskmanager/NoOpCheckpointResponder.java]
+
+**Uncertainties**
+- retrieval returned the class-level field names, but not a full getter-to-caller map, so I cannot prove from this evidence alone which exact reporting call site reads each field.
+- The neighboring test bodies were not fully surfaced, so I can name the right tests to inspect, but not claim their exact assertions without more source.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the Flink 2.2.0 checkpointing docs and on `org.apache.flink.runtime.checkpoint.CheckpointMetrics`.
+- For reporting, the fields to treat as observable are the checkpoint timing and size metrics exposed by `CheckpointMetrics`: `alignmentDurationNanos`, `checkpointStartDelayNanos`, `syncDurationMillis`, `asyncDurationMillis`, `bytesPersistedOfThisCheckpoint`, and `totalBytesPersisted`.
+- I would treat any other field as non-reporting unless a consumer test proves it is propagated end-to-end.
+
+**Implementation anchors**
+- Version-pinned docs: the Flink 2.2 release checkpointing page on the `flink-docs-release-2.2` docs site.
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java`.
+- Reporting path to inspect next: the checkpoint stats/reporting code in the same runtime checkpoint package, especially the classes that convert `CheckpointMetrics` into tracked checkpoint statistics.
+
+**Tests to inspect or add**
+- Inspect any package-local tests beside `CheckpointMetrics`, especially a focused `CheckpointMetricsTest` if it exists.
+- Inspect the checkpoint stats tests that consume the metrics, such as `CheckpointStatsTrackerTest` and nearby checkpoint-coordinator tests.
+- Add or strengthen one test that creates a `CheckpointMetrics`, passes it through the reporting path, and asserts each consumed getter survives unchanged.
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointMetrics.java`
+- `https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/`
+
+**Uncertainties**
+- I am not fully certain whether `bytesBufferedInAlignment` is consumed by the 2.2.0 reporting path or just carried on the object.
+- I cannot पुष्टि the exact neighboring test filenames in your 2.2.0 tree without inspection, so treat the test names above as the likely anchors, not a guarantee.

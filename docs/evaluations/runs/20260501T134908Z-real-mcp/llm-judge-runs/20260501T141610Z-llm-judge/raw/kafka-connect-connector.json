@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.78,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A better matches the actual Kafka Connect 4.2.0 base contract: `Connector` Javadoc plus direct `connect/api` unit tests (`ConnectorTest`, `SourceConnectorTest`, `SinkConnectorTest`) are the right anchors. B has good version-pinned docs, but it misses the direct api-module tests and instead leans on runtime integration tests that are adjacent rather than contract-defining.",
+  "critical_issues": {
+    "A": [
+      "Does not give the exact 4.2.0 Javadoc URL, only the class/name and artifact.",
+      "Could be slightly more explicit that `taskClass` and `taskConfigs` are base-`Connector` methods, not just generic lifecycle hooks."
+    ],
+    "B": [
+      "Claims the retrieval system did not surface a dedicated `Connector` unit test suite, but `connect/api/src/test/java/org/apache/kafka/connect/connector/ConnectorTest.java` exists in 4.2.0.",
+      "Leans on `ConnectorValidationIntegrationTest` and `ExactlyOnceSourceIntegrationTest`, which are useful runtime neighbors but not the closest anchors for the base connector contract."
+    ]
+  }
+}

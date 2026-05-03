@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.94,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A names the right Flink 2.2.0 implementation class, pins to release docs, and points to the handler-initialization path plus relevant neighboring tests. B is weaker and likely wrong on package paths and test names, and it hedges instead of anchoring to concrete source artifacts. A is better for an engineer changing Java code.",
+  "critical_issues": {
+    "A": [
+      "Does not name the exact handler classes registered, only the initialization path.",
+      "Test coverage examples are neighboring patterns, not a direct DispatcherRestEndpoint test."
+    ],
+    "B": [
+      "Likely hallucinates legacy package paths under `...rest.handler.legacy.dispatcher`.",
+      "Citations are not concrete enough to verify the claimed anchor points.",
+      "Overstates uncertainty while still asserting a possibly wrong method name and test class names."
+    ]
+  }
+}

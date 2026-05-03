@@ -1,0 +1,129 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-distributed-config
+TITLE: Kafka Connect pattern for DistributedConfig
+QUESTION:
+For Kafka Connect 4.2.0, inspect `DistributedConfig`: inspect distributed worker configuration behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the 4.2.0 Connect distributed-worker config docs, but treat the implementation class and unit tests as the primary source of truth. For distributed-mode behavior, `DistributedConfig` is the config boundary; follow its validation/defaulting into the distributed herder startup path.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedConfig.java`
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java`
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java`
+- Version-pinned docs: the Kafka 4.2.0 Connect configuration docs for distributed workers, plus the `connect-distributed.properties` sample config
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedConfigTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConfigTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java`
+- If behavior changed, add a focused regression test for the exact distributed-only config key or precedence rule in question
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedConfig.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedConfigTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConfigTest.java`
+- `config/connect-distributed.properties`
+
+**Uncertainties**
+- I’m not fully certain whether the 4.2.0 docs expose this as a standalone distributed-worker page or as part of the general Connect config section.
+- I’m not fully certain whether 4.2.0 has additional neighboring distributed startup tests beyond the three test classes above, but these are the right anchors.
+
+ANSWER B:
+**Recommendation**
+Anchor any Kafka Connect 4.2.0 answer about `DistributedConfig` on the versioned Kafka 4.2 docs plus the runtime implementation and the dedicated config test. The strongest evidence is the `DistributedConfig` class itself and `DistributedConfigTest`; use the docs only for user-facing behavior context, not for implementation details.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Kafka Connect User Guide: [https://kafka.apache.org/42/kafka-connect/user-guide/](https://kafka.apache.org/42/kafka-connect/user-guide/)
+  - Kafka Connect Configs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/](https://kafka.apache.org/42/configuration/kafka-connect-configs/)
+  - Kafka Connect Connector Development Guide: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- Implementation class:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedConfig.java` ([repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedConfig.java])
+- Neighboring runtime references:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedConfigTest.java` ([repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedConfigTest.java])
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/util/clusters/EmbeddedConnectCluster.java` references `DistributedConfig` constants in cluster setup ([repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/clusters/EmbeddedConnectCluster.java])
+
+**Tests to inspect or add**
+- Inspect `DistributedConfigTest` first; it already covers config validation around distributed-worker security and related config parsing.
+- Inspect `EmbeddedConnectCluster` for end-to-end usage of `DistributedConfig` constants in distributed worker startup.
+- If you need more coverage for behavior changes, add focused unit tests to `DistributedConfigTest` rather than broad integration tests, unless the change affects worker startup or cluster wiring.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/), [https://kafka.apache.org/42/kafka-connect/user-guide/](https://kafka.apache.org/42/kafka-connect/user-guide/), [https://kafka.apache.org/42/configuration/kafka-connect-configs/](https://kafka.apache.org/42/configuration/kafka-connect-configs/), [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedConfig.java)
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedConfigTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedConfigTest.java), [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/clusters/EmbeddedConnectCluster.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/clusters/EmbeddedConnectCluster.java)
+
+**Uncertainties**
+- retrieval system surfaced the direct config test and one adjacent cluster fixture, but not a larger set of neighboring tests specifically about distributed worker configuration.
+- I did not infer any specific config semantics beyond what the surfaced sources support.

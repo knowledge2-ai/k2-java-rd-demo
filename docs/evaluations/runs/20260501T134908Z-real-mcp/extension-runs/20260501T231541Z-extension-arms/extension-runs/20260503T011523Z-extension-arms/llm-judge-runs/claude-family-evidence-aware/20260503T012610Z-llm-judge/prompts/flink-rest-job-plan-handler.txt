@@ -1,0 +1,330 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- If evidence snippets are provided, use them to verify cited methods/classes. Do not call a cited method fabricated when the evidence snippet contains that method.
+- If a cited claim is not supported by either the answer text or provided evidence, treat that as risk. Do not rely on general prior expectations over concrete evidence.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-plan-handler
+TITLE: Flink REST pattern for JobPlanHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobPlanHandler`: explain how plan metadata is returned through a REST handler. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on `JobPlanHandler` itself and trace the data path from `AccessExecutionGraph.getPlan()` to `JobPlanInfo`. The handler is a thin REST adapter: `handleRequest()` returns `createJobPlanInfo(executionGraph)`, and `archiveJsonWithPath()` archives the same `JobPlanInfo` under the job-specific endpoint path. The concrete plan data is produced earlier when the execution graph is built from `JsonPlanGenerator.generatePlan(jobGraph)` and stored via `executionGraph.setPlan(...)`. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L60-L80] [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/executiongraph/DefaultExecutionGraphBuilder.java#L171-L197]
+
+**Implementation anchors**
+- `JobPlanHandler.handleRequest(...)` directly returns `createJobPlanInfo(executionGraph)`, so the REST response is just a wrapper around the execution graph’s stored plan. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L60-L80]
+- `createJobPlanInfo(...)` constructs `new JobPlanInfo(executionGraph.getPlan())`, which is the key handoff from runtime state to REST DTO. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L77-L80]
+- `archiveJsonWithPath(...)` uses `getTargetRestEndpointURL()` plus the job-id path parameter to archive the same response body at the REST endpoint path. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L67-L75]
+- `JobPlanHeaders` defines the contract: `GET`, empty request body, `JobPlanInfo` response, `200 OK`, and the endpoint description “Returns the dataflow plan of a job.” [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java#L34-L72]
+- `DefaultExecutionGraphBuilder` is where the plan metadata is populated, via `JsonPlanGenerator.generatePlan(jobGraph)`, with a fallback to an empty `JobPlanInfo.Plan` if generation fails. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/executiongraph/DefaultExecutionGraphBuilder.java#L171-L197]
+
+**Tests to inspect or add**
+- `JobPlanInfoTest` should be the first serialization anchor for the REST DTO itself. [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/JobPlanInfoTest.java]
+- `JsonGeneratorTest` covers the plan-generation side, including core fields like job id, name, type, and non-empty nodes. [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/jobgraph/jsonplan/JsonGeneratorTest.java#L110-L136]
+- `JobDetailsHandlerTest` is a nearby REST-handler pattern worth mirroring if you want a handler-level regression test for a JSON-backed field. [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java#L99-L119]
+- If you add coverage, a dedicated `JobPlanHandler` test should assert `handleRequest()` returns the wrapped plan and `archiveJsonWithPath()` uses the endpoint path built from the job ID. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L60-L80]
+
+**Citations**
+- `JobPlanHandler`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L60-L80]
+- `JobPlanHeaders`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java#L34-L72]
+- `DefaultExecutionGraphBuilder`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/executiongraph/DefaultExecutionGraphBuilder.java#L171-L197]
+- `JobPlanInfo`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanInfo.java#L181-L306]
+- Version-pinned REST docs generators: [repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L64-L85] [repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java#L40-L62]
+- REST versioning: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java#L26-L52]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/JobPlanInfoTest.java] [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/jobgraph/jsonplan/JsonGeneratorTest.java#L110-L136] [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java#L99-L119]
+
+**Uncertainties**
+- No dedicated `JobPlanHandlerTest` surfaced in the retrieved evidence; the nearest anchors are the DTO serialization test and the JSON plan generator test.
+
+EVIDENCE FOR ANSWER A:
+[
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "guides",
+    "path": "guides/flink/rest-handler-checklist.md",
+    "snippet": "# REST Handler Implementation Checklist\n\nUse this guide before adding a controller-like endpoint.\n\n1. Start with the public API or REST documentation for the target version.\n2. Find an existing handler in the same module and API surface.\n3. Identify request parameters, response body classes, route registration, and handler tests.\n4. Search tests before editing production code.\n5. Cite the docs, source class, and neighboring test in the implementation plan.\n",
+    "source_kind": "guide",
+    "source_uri": "generated://guides/flink/rest-handler-checklist.md"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/ops/rest_api/index.html",
+    "snippet": "Developing\n#\nThe REST API backend is in the flink-runtime project. The core class is org.apache.flink.runtime.webmonitor.WebMonitorEndpoint, which sets up the server and the request routing.\nWe use Netty and the Netty Router library to handle REST requests and translate URLs. This choice was made because this combination has lightweight dependencies, and the performance of Netty HTTP is very good.\nTo add new requests, one needs to\n- add a new MessageHeaders class which serves as an interface for the new request,\n- add a new AbstractRestHandler class which handles the request according to the added MessageHeaders class,\n- add the handler to org.apache.flink.runtime.webmonitor.WebMonitorEndpoi",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/index.html",
+    "snippet": "\"id\" : \"urn:jsonschema:org:apache:flink:table:gateway:rest:message:statement:ExecuteStatementRequestBody\",\n\"properties\" : {\n\"executionConfig\" : {\n\"type\" : \"object\",\n\"additionalProperties\" : {\n\"type\" : \"string\"\n}\n},\n\"executionTimeout\" : {\n\"type\" : \"integer\"\n},\n\"statement\" : {\n\"type\" : \"string\"\n}\n}\n}\nResponse\n{\n\"type\" : \"object\",\n\"id\" : \"urn:jsonschema:org:apache:flink:table:gateway:rest:message:statement:ExecuteStatementResponseBody\",\n\"properties\" : {\n\"operationHandle\" : {\n\"type\" : \"string\"\n}\n}\n}\nv2\n/api_versions\nVerb: GET\nResponse code: 200 OK\nGet the current available versions for the Rest Endpoint. The client can choose one of the return version as the protocol for later communicate.\nReque",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/#part-0013"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/index.html",
+    "snippet": "Title: REST Endpoint | Apache Flink\nURL: https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/\nRepository: apache/flink\nRef: release-2.2.0\nPath: flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/index.html\nFramework: flink 2.2.0\nSource kind: docs\nAPI surface: rest\n\nREST Endpoint\n#\nThe REST endpoint allows user to connect to SQL Gateway with REST API.\n\nOverview of SQL Processing\n#\n\nOpen Session\n#\nWhen the client connects to the SQL Gateway, the SQL Gateway creates a Session as the context to store the users-specified information\nduring the interactions between the client and SQL Gateway. After the creation of the Session, the SQL Gateway server ",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/rest/#part-0001"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/ops/rest_api/index.html",
+    "snippet": "Title: REST API | Apache Flink\nURL: https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/\nRepository: apache/flink\nRef: release-2.2.0\nPath: flink/flink-docs-release-2.2/docs/ops/rest_api/index.html\nFramework: flink 2.2.0\nSource kind: docs\nAPI surface: rest\n\nREST API\n#\nFlink has a monitoring API that can be used to query status and statistics of running jobs, as well as recent completed jobs.\nThis monitoring API is used by Flink\u2019s own dashboard, but is designed to be used also by custom monitoring tools.\nThe monitoring API is a REST-ful API that accepts HTTP requests and responds with JSON data.\n\nOverview\n#\nThe monitoring API is backed by a web server that runs as part ",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/ops/rest_api/index.html",
+    "snippet": "\"id\" : \"urn:jsonschema:org:apache:flink:runtime:rest:messages:LogUrlResponse\",\n\"properties\" : {\n\"url\" : {\n\"type\" : \"string\"\n}\n}\n}\n/jobs/:jobid/metrics\nVerb: GET\nResponse code: 200 OK\nProvides access to job metrics.\nPath parameters\n- jobid - 32-character hexadecimal string value that identifies a job.\nQuery parameters\n- get (optional): Comma-separated list of string values to select specific metrics.\nRequest\n{}\nResponse\n{\n\"type\" : \"any\"\n}\n/jobs/:jobid/plan\nVerb: GET\nResponse code: 200 OK\nReturns the dataflow plan of a job.\nPath parameters\n- jobid - 32-character hexadecimal string value that identifies a job.\nRequest\n{}\nResponse\n{\n\"type\" : \"object\",\n\"id\" : \"urn:jsonschema:org:apache:flink:runt",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0030"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/ops/rest_api/index.html",
+    "snippet": "jsonschema:org:apache:flink:runtime:rest:messages:JobPlanInfo\",\n\"properties\" : {\n\"plan\" : {\n\"type\" : \"object\",\n\"id\" : \"urn:jsonschema:org:apache:flink:runtime:rest:messages:JobPlanInfo:Plan\",\n\"properties\" : {\n\"jid\" : {\n\"type\" : \"string\"\n},",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0007"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/ops/rest_api/index.html",
+    "snippet": "\"name\" : {\n\"type\" : \"string\"\n},\n\"nodes\" : {\n\"type\" : \"array\",\n\"items\" : {\n\"type\" : \"object\",\n\"id\" : \"urn:jsonschema:org:apache:flink:runtime:rest:messages:JobPlanInfo:Plan:Node\",\n\"properties\" : {\n\"description\" : {\n\"type\" : \"string\"\n},\n\"id\" : {\n\"type\" : \"string\"\n},\n\"inputs\" : {\n\"type\" : \"array\",\n\"items\" : {\n\"type\" : \"object\",\n\"id\" : \"urn:jsonschema:org:apache:flink:runtime:rest:messages:JobPlanInfo:Plan:Node:Input\",\n\"properties\" : {\n\"caching\" : {\n\"type\" : \"string\"\n},\n\"exchange\" : {\n\"type\" : \"string\"\n},\n\"id\" : {\n\"type\" : \"string\"\n},\n\"local_strategy\" : {\n\"type\" : \"string\"\n},\n\"num\" : {\n\"type\" : \"integer\"\n},\n\"ship_strategy\" : {\n\"type\" : \"string\"\n}\n}\n}\n},\n\"operator\" : {\n\"type\" : \"string\"\n},\n\"opera",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0008"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "flink/flink-docs-release-2.2/docs/ops/rest_api/index.html",
+    "snippet": "API\n#\nThe REST API is versioned, with specific versions being queryable by prefixing the url with the version prefix. Prefixes are always of the form v[version_number].\nFor example, to access version 1 of /foo/bar one would query /v1/foo/bar.\nIf no version is specified Flink will default to the oldest version supporting the request.\nQuerying unsupported/non-existing versions will return a 404 error.\nThere exist several async operations among these APIs, e.g. trigger savepoint, rescale a job. They would return a triggerid to identify the operation you just POST and then you need to use that triggerid to query for the status of the operation.\nFor (stop-with-)savepoint operations you can contro",
+    "source_kind": "docs",
+    "source_uri": "https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "JobPlanHandler",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L60-L80",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java",
+    "snippet": "60:     protected JobPlanInfo handleRequest(\n61:             HandlerRequest<EmptyRequestBody> request, AccessExecutionGraph executionGraph)\n62:             throws RestHandlerException {\n63:         return createJobPlanInfo(executionGraph);\n64:     }\n65: \n66:     @Override\n67:     public Collection<ArchivedJson> archiveJsonWithPath(AccessExecutionGraph graph)\n68:             throws IOException {\n69:         ResponseBody json = createJobPlanInfo(graph);\n70:         String path =\n71:                 getMessageHeaders()\n72:                         .getTargetRestEndpointURL()\n73:                         .replace(':' + JobIDPathParameter.KEY, graph.getJobID().toString());\n74:         return Collec",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "JobPlanHeaders",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java#L34-L72",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java",
+    "snippet": "34:     private JobPlanHeaders() {}\n35: \n36:     @Override\n37:     public Class<EmptyRequestBody> getRequestClass() {\n38:         return EmptyRequestBody.class;\n39:     }\n40: \n41:     @Override\n42:     public Class<JobPlanInfo> getResponseClass() {\n43:         return JobPlanInfo.class;\n44:     }\n45: \n46:     @Override\n47:     public HttpResponseStatus getResponseStatusCode() {\n48:         return HttpResponseStatus.OK;\n49:     }\n50: \n51:     @Override\n52:     public JobMessageParameters getUnresolvedMessageParameters() {\n53:         return new JobMessageParameters();\n54:     }\n55: \n56:     @Override\n57:     public HttpMethodWrapper getHttpMethod() {\n58:         return HttpMethodWrapper.GET;\n5",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "RestHandlerSpecification",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/RestHandlerSpecification.java#L19-L50",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/RestHandlerSpecification.java",
+    "snippet": "19: package org.apache.flink.runtime.rest.handler;\n20: \n21: import org.apache.flink.runtime.rest.HttpMethodWrapper;\n22: import org.apache.flink.runtime.rest.versioning.RestAPIVersion;\n23: \n24: import java.util.Collection;\n25: \n26: /** Rest handler interface which all rest handler implementation have to implement. */\n27: public interface RestHandlerSpecification {\n28: \n29:     /**\n30:      * Returns the {@link HttpMethodWrapper} to be used for the request.\n31:      *\n32:      * @return http method to be used for the request\n33:      */\n34:     HttpMethodWrapper getHttpMethod();\n35: \n36:     /**\n37:      * Returns the generalized endpoint url that this request should be sent to, for example {@",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/RestHandlerSpecification.java"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "WebContentHandlerSpecification",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/files/WebContentHandlerSpecification.java#L24-L50",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/files/WebContentHandlerSpecification.java",
+    "snippet": "24: \n25: import java.util.Collection;\n26: import java.util.Collections;\n27: \n28: /** Rest handler specification for the web content handler. */\n29: public final class WebContentHandlerSpecification implements RestHandlerSpecification {\n30: \n31:     private static final WebContentHandlerSpecification INSTANCE =\n32:             new WebContentHandlerSpecification();\n33: \n34:     private WebContentHandlerSpecification() {}\n35: \n36:     @Override\n37:     public HttpMethodWrapper getHttpMethod() {\n38:         return HttpMethodWrapper.GET;\n39:     }\n40: \n41:     @Override\n42:     public String getTargetRestEndpointURL() {\n43:         return \"/:*\";\n44:     }\n45: \n46:     public static WebContentHand",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/files/WebContentHandlerSpecification.java"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "WebMonitorEndpoint",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java#L759-L785",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java",
+    "snippet": "759:         handlers.add(\n760:                 Tuple2.of(\n761:                         checkpointStatisticsHandler.getMessageHeaders(),\n762:                         checkpointStatisticsHandler));\n763:         handlers.add(\n764:                 Tuple2.of(\n765:                         checkpointStatisticDetailsHandler.getMessageHeaders(),\n766:                         checkpointStatisticDetailsHandler));\n767:         handlers.add(Tuple2.of(jobPlanHandler.getMessageHeaders(), jobPlanHandler));\n768:         handlers.add(\n769:                 Tuple2.of(\n770:                         taskCheckpointStatisticDetailsHandler.getMessageHeaders(),\n771:                         taskCheckpointStatisticDetai",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "HandlerRequestException",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/HandlerRequestException.java#L20-L39",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/HandlerRequestException.java",
+    "snippet": "20: \n21: import org.apache.flink.util.FlinkException;\n22: \n23: /** Base class for all {@link HandlerRequest} related exceptions. */\n24: public class HandlerRequestException extends FlinkException {\n25: \n26:     private static final long serialVersionUID = 7310878739304006028L;\n27: \n28:     public HandlerRequestException(String message) {\n29:         super(message);\n30:     }\n31: \n32:     public HandlerRequestException(Throwable cause) {\n33:         super(cause);\n34:     }\n35: \n36:     public HandlerRequestException(String message, Throwable cause) {\n37:         super(message, cause);\n38:     }\n39: }",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/HandlerRequestException.java"
+  },
+  {
+    "api_surface": "rest",
+    "class_name": "AbstractRestHandler",
+    "line_source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java#L77-L105",
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java",
+    "snippet": "77:             HttpRequest httpRequest,\n78:             HandlerRequest<R> handlerRequest,\n79:             T gateway) {\n80:         CompletableFuture<P> response;\n81: \n82:         try {\n83:             response = handleRequest(handlerRequest, gateway);\n84:         } catch (RestHandlerException e) {\n85:             response = FutureUtils.completedExceptionally(e);\n86:         }\n87: \n88:         return response.thenAccept(\n89:                 resp ->\n90:                         HandlerUtils.sendResponse(\n91:                                 ctx,\n92:                                 httpRequest,\n93:                                 resp,\n94:                                 messageHeaders.getRespon",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/AbstractRestHandler.java"
+  }
+]
+
+ANSWER B:
+**Recommendation**
+Explain `GET /jobs/:jobid/plan` as a thin REST wrapper over the execution graph’s stored plan. `JobPlanHandler` pulls the `AccessExecutionGraph`, calls `executionGraph.getPlan()`, wraps that in `JobPlanInfo`, and returns it as the response body. The JSON payload is a single top-level `plan` object with job metadata plus per-node plan metadata. `JobPlanHeaders` is the contract for the endpoint, and `JobPlanInfo` is the serialized response model.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L43-L78`  
+  Handler implementation; `handleRequest()` returns `new JobPlanInfo(executionGraph.getPlan())`, and `archiveJsonWithPath()` uses the same response for archived REST JSON.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java#L26-L73`  
+  Endpoint contract: `GET`, status `200 OK`, URL `/jobs/:jobid/plan`, description `"Returns the dataflow plan of a job."`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanInfo.java#L51-L60` and `#L176-L197`  
+  Response model: top-level `plan`, then `Plan` fields `jid`, `name`, `type`, `nodes`; nested nodes carry `id`, `parallelism`, `operator`, `operator_strategy`, `description`, `optimizer_properties`, and `inputs`.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/jobgraph/jsonplan/JsonPlanGenerator.java#L51-L147`  
+  Source of the plan object: converts `JobGraph` into `JobPlanInfo.Plan`, including node/input metadata.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/RuntimeMessageHeaders.java#L41-L44`  
+  Version default for runtime REST headers is `V1`; `JobPlanHeaders` inherits this.
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L72-L83` and `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java#L48-L60`  
+  Version-pinned doc generation for the runtime API: production docs emit `V1` and skip `V0`.
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/JobPlanInfoTest.java#L28-L40`  
+  Marshalling/unmarshalling coverage for the response model.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/jobgraph/jsonplan/JsonGeneratorTest.java#L53-L147`  
+  Verifies plan generation from a `JobGraph`, including job metadata and node list contents.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/JobDetailsInfoTest.java#L40-L89`  
+  Confirms `JobDetailsInfo` carries a `JobPlanInfo.Plan`, which is the neighboring data path.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java#L112-L118`  
+  Checks related handler wiring for the stream-graph JSON; useful as the nearest handler-level pattern.
+- Add if you want direct endpoint coverage: `JobPlanHandlerTest`  
+  I did not find an existing handler-specific unit test for `JobPlanHandler`, so a focused test would be the natural gap.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java#L43-L78`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanHeaders.java#L26-L73`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanInfo.java#L51-L60`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobPlanInfo.java#L176-L197`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/jobgraph/jsonplan/JsonPlanGenerator.java#L51-L147`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/RuntimeMessageHeaders.java#L41-L44`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L72-L83`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java#L48-L60`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/JobPlanInfoTest.java#L28-L40`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/jobgraph/jsonplan/JsonGeneratorTest.java#L53-L147`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/JobDetailsInfoTest.java#L40-L89`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java#L112-L118`
+
+**Uncertainties**
+- I did not find a direct `JobPlanHandlerTest`; the closest coverage is model marshalling plus `JsonPlanGenerator` and neighboring job-details tests.
+- The repo’s docs generator is version-aware, but the endpoint itself is not version-specialized in `JobPlanHeaders`; it inherits the runtime default `V1`.
+
+EVIDENCE FOR ANSWER B:
+[
+  {
+    "api_surface": "rest",
+    "class_name": "JobPlanHandler",
+    "line_source_uri": null,
+    "module": "flink-runtime",
+    "path": "flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java",
+    "snippet": "JobPlanHandler",
+    "source_kind": "code",
+    "source_uri": "repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobPlanHandler.java"
+  }
+]

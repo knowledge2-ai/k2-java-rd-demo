@@ -1,0 +1,138 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-taskmanager-details-handler
+TITLE: Flink REST pattern for TaskManagerDetailsHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `TaskManagerDetailsHandler`: inspect task-manager detail lookup behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the version-pinned Flink 2.2.0 REST API docs for `/taskmanagers/:taskmanagerid`, then trace the behavior in `TaskManagerDetailsHandler` and its direct test `TaskManagerDetailsHandlerTest`. The retrieved evidence does not show a separate lookup-specific spec beyond those anchors, so don’t infer behavior beyond what the implementation/test confirms.
+
+**Implementation anchors**
+- REST API 2.2.0 overview and versioning rules: [`https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001`](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001) and [`https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003`](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003)
+- TaskManager details endpoint docs: [`https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0051`](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0051)
+- Core implementation class: [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandler.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandler.java)
+- Request/response header contract: [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsHeaders.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsHeaders.java)
+
+**Tests to inspect or add**
+- Direct neighbor test: [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandlerTest.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandlerTest.java)
+- Secondary neighboring REST handler tests surfaced by retrieval system, if you need pattern context:
+  - [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/metrics/TaskManagerMetricsHandlerTestBase.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/metrics/TaskManagerMetricsHandlerTestBase.java)
+  - [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TestUntypedMessageHeaders.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TestUntypedMessageHeaders.java)
+
+**Citations**
+- REST API docs and endpoint docs: [`https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001`](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001), [`https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003`](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003), [`https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0051`](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0051)
+- Implementation: [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandler.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandler.java)
+- Headers: [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsHeaders.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsHeaders.java)
+- Tests: [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandlerTest.java`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandlerTest.java)
+
+**Uncertainties**
+- retrieval system surfaced only one directly relevant test, `TaskManagerDetailsHandlerTest`; it did not provide a second lookup-specific regression test to cite.
+- I did not verify the handler’s exact lookup edge cases from the source body here, so any claim about missing-ID or null-ID behavior would need a deeper source read.
+
+ANSWER B:
+**Recommendation**
+Use the REST handler and the versioned runtime doc generators as the source of truth. For lookup behavior, `TaskManagerDetailsHandler` resolves the `taskmanagerid` path parameter, calls `ResourceManagerGateway.requestTaskManagerDetailsInfo(...)`, and maps `UnknownTaskExecutorException` to HTTP 404 with `"Could not find TaskExecutor ..."`. The docs are version-pinned through `RuntimeRestAPIVersion.V1`; there is no checked-in rendered page in this checkout, so the generator classes are the stable anchor.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandler.java#L83-L135`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsHeaders.java#L28-L76`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java#L30-L34`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L69-L83`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java#L45-L60`
+
+**Tests to inspect or add**
+- Inspect: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandlerTest.java#L59-L130`
+- Inspect: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsInfoTest.java#L35-L54`
+- Inspect as siblings for the same 404 mapping pattern:
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerLogListHandlerTest.java#L88-L105`
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerProfilingListHandlerTest.java#L91-L110`
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerProfilingHandlerTest.java#L87-L103`
+- Inspect upstream contract coverage:
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/resourcemanager/ResourceManagerTest.java#L195-L209`
+  - `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/resourcemanager/ResourceManagerTaskExecutorTest.java#L161-L186`
+- Add if missing: a `TaskManagerDetailsHandlerTest` case for `UnknownTaskExecutorException -> RestHandlerException(404)` mirroring the sibling handlers.
+
+**Citations**
+- `TaskManagerDetailsHandler` lookup and 404 mapping: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandler.java#L83-L135`
+- REST endpoint metadata and URL: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/taskmanager/TaskManagerDetailsHeaders.java#L28-L76`
+- Version pinning: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java#L30-L34`
+- Runtime HTML docs generation: `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java#L69-L83`
+- Runtime OpenAPI generation: `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java#L45-L60`
+- Direct test for handler behavior: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerDetailsHandlerTest.java#L59-L130`
+- Parallel sibling 404 tests:  
+  `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerLogListHandlerTest.java#L88-L105`  
+  `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerProfilingListHandlerTest.java#L91-L110`  
+  `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/taskmanager/TaskManagerProfilingHandlerTest.java#L87-L103`
+
+**Uncertainties**
+- I did not find a checked-in rendered REST docs page for this endpoint in the repo snapshot, so the safest docs anchor is the versioned generator path plus `RuntimeRestAPIVersion.V1`.
+- `TaskManagerDetailsHandlerTest` currently covers metrics extraction, not the 404 lookup failure; if you need full lookup coverage, that negative case should be added.

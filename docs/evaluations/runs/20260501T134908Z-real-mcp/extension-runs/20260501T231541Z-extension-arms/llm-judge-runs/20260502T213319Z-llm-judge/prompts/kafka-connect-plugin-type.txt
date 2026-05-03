@@ -1,0 +1,142 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugin-type
+TITLE: Kafka Connect pattern for PluginType
+QUESTION:
+For Kafka Connect 4.2.0, inspect `PluginType`: inspect plugin type classification. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the answer on `PluginType` as the source of truth for Connect plugin classification. In Kafka Connect 4.2, it defines the nine plugin categories and the lowercase JSON name via `toString()`.
+- For the “docs” side, use the source Javadocs on the two scanners: they spell out which concrete class families are classified into each `PluginType`. I did not find separate `docs/` or `*.adoc` files for this topic in this checkout, so the scanner Javadocs are the version-pinned docs to cite.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java#L33-L62`  
+  Enum values, backing superclasses, `simpleName()`, `superClass()`, and lowercase `toString()`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ReflectionScanner.java#L43-L68` and `#L86-L95`  
+  Legacy discovery docs plus the hard-coded classification map for sink/source/converter/header converter/transformation/predicate/config provider/rest extension/override policy.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ServiceLoaderScanner.java#L32-L52` and `#L57-L68`  
+  Modern discovery docs with the same classification set, but service-loader only.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java#L32-L48` and `#L83-L90`  
+  Carries `PluginType` through `type` and `typeName`, with `typeName` derived from `PluginType.toString()`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfo.java#L25-L34`  
+  REST-facing record that exposes `PluginType` directly.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L62-L90`, `#L125-L152`, `#L310-L339`  
+  Validates `PluginType` stored on descriptors, lowercase `typeName`, and null-handling.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfoTest.java#L45-L73`  
+  Best neighbor for JSON round-trip of `PluginType` as lowercase `sink`/`source`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L131-L158`, `#L360-L388`  
+  Exercises classification of sinks/sources/converters/header converters/transformations/predicates and REST exposure.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L70-L85`, `#L162-L193`  
+  Useful for versioned plugin discovery across all `PluginType.values()`.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java#L33-L62`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ReflectionScanner.java#L43-L68`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ReflectionScanner.java#L86-L95`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ServiceLoaderScanner.java#L32-L52`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ServiceLoaderScanner.java#L57-L68`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java#L32-L48`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java#L83-L90`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfo.java#L25-L34`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L62-L90`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfoTest.java#L45-L73`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L131-L158`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L360-L388`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L70-L85`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L162-L193`
+
+**Uncertainties**
+- I did not find separate markdown/adoc docs for `PluginType` in this source checkout; if you meant published release docs outside the tree, they are not present here.
+- There is no dedicated `PluginTypeTest`; the closest coverage is split across descriptor, REST serialization, and scanner tests.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Kafka 4.2-pinned Connect docs plus the runtime isolation enum/class itself. The strongest doc anchor is the 4.2 Connect user guide section that describes plugin manifests and the expected plugin superclasses, and the implementation anchor is `PluginType` in Connect runtime isolation. If you need behavior proof for versioned plugin classification, use the neighboring isolation test coverage; retrieval system surfaced `MultiVersionTest` as the closest test anchor. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040] [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java] [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+
+**Implementation anchors**
+- Version-pinned docs: Kafka Connect 4.2 user guide plugin manifest section, which lists the plugin superclass categories expected to have manifests and explains how Connect classifies discoverable plugins. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040]
+- Version-pinned docs: Kafka Connect 4.2 connector development guide for the surrounding plugin/developer model. [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Implementation class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java` in the `apache/kafka@4.2` tree. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java` for versioned plugin loading and plugin-type coverage. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+- I did not get a dedicated `PluginTypeTest` result from retrieval system, so if the repo lacks one, add a focused unit test for the classification matrix in `PluginType`. The retrieved evidence is incomplete on that point.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040]
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginType.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+
+**Uncertainties**
+- The returned retrieved evidence did not expose the body of `PluginType.java`, so I cannot state the exact enum values or classification rules from this run without guessing.
+- retrieval system did not surface a dedicated `PluginTypeTest`, so test anchoring is currently indirect via `MultiVersionTest`.

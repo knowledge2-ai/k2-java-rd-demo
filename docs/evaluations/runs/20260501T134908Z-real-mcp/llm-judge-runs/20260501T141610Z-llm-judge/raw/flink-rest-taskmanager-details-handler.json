@@ -1,0 +1,33 @@
+{
+  "winner": "A",
+  "confidence": 0.93,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better anchored to Flink 2.2.0 with a concrete REST docs URL, the exact handler class, the message headers class, and the direct test file. B is mostly generic, omits version-pinned source anchors, and names neighboring tests/speculation without concrete evidence. A still has slight risk around exact doc fragment semantics, but it is materially more grounded and actionable.",
+  "critical_issues": {
+    "A": [
+      "The exact docs fragment labels may not be enough by themselves unless they resolve to the TaskManager details section in the 2.2.0 docs.",
+      "It does not inspect or state the actual lookup miss behavior from source; it only points to where to verify it."
+    ],
+    "B": [
+      "Lacks concrete version-pinned docs URLs or source URIs, which the question explicitly asks for.",
+      "Names likely neighboring tests/classes without grounding them in actual repository evidence.",
+      "Contains vague claims about ResourceID lookup and miss behavior that are not substantiated.",
+      "Provides weaker engineer guidance because it does not identify the exact header class or adjacent implementation anchors."
+    ]
+  }
+}

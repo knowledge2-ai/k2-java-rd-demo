@@ -1,0 +1,143 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-standalone-checkpoint-id-counter
+TITLE: Flink checkpointing pattern for StandaloneCheckpointIDCounter
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `StandaloneCheckpointIDCounter`: inspect standalone checkpoint id allocation. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the release-pinned Flink 2.2.0 checkpointing docs plus the runtime implementation and its dedicated test. The retrieved evidence is enough to identify the right files, but it does not surface method-level behavior for `StandaloneCheckpointIDCounter`, so avoid stating exact allocation semantics beyond what the class/test naming and inheritance support.
+
+**Implementation anchors**
+- Version-pinned docs for checkpointing concepts:
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001)
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001)
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001)
+- Implementation class:
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounter.java](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounter.java)
+  - retrieval system identifies it as `org.apache.flink.runtime.checkpoint.StandaloneCheckpointIDCounter` implementing `CheckpointIDCounter`.
+- Neighboring test:
+  - [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java)
+  - retrieval system identifies it as extending `CheckpointIDCounterTestBase`.
+
+**Tests to inspect or add**
+- Inspect [StandaloneCheckpointIDCounterTest.java](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java) first; it is the direct regression anchor.
+- Inspect the inherited [CheckpointIDCounterTestBase](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointIDCounterTestBase.java) next, since the concrete standalone test inherits its contract there. retrieval did not return that file explicitly, so this is the main gap.
+- If you need an additional regression, add it beside the existing standalone test to cover any standalone-specific allocation edge case; retrieved evidence did not surface another dedicated test class for this counter.
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001), [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001), [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001)
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounter.java](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounter.java)
+- Test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java)
+
+**Uncertainties**
+- retrieval system did not expose the method body of `StandaloneCheckpointIDCounter`, so I cannot safely claim the exact allocation algorithm from this evidence alone.
+- retrieval system surfaced the concrete standalone test but not `CheckpointIDCounterTestBase`; that base test should be checked directly before making behavior-specific claims.
+- The docs returned are general checkpointing/state docs, not class-specific references, so they are context anchors rather than proof of implementation details.
+
+ANSWER B:
+**Recommendation**
+- Treat `StandaloneCheckpointIDCounter` in Flink 2.2.0 as a trivial, non-persistent `AtomicLong` counter for `HighAvailabilityMode#NONE`: it starts at `INITIAL_CHECKPOINT_ID` (`1`), `getAndIncrement()` returns the current value then advances, and `getLast()` returns `current - 1`.
+- For a version-pinned answer, anchor on the source Javadocs and the tests in this 2.2.0 tree. I did not find a separate standalone checkpointing docs page under `flink-docs` in this checkout.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounter.java#L28-L68`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointIDCounter.java#L21-L38`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointRecoveryFactory.java#L28-L50`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PerJobCheckpointRecoveryFactory.java#L55-L95`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/highavailability/TestingHighAvailabilityServicesBuilder.java#L68-L70` for the no-HA default wiring
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/scheduler/SchedulerUtilsTest.java#L76-L86` for factory selection in scheduler setup
+
+**Tests to inspect or add**
+- Inspect `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointIDCounterTestBase.java#L39-L165` for the actual allocation contract: initial non-negative state, serial increments from `1`, concurrency, and `setCount`.
+- Inspect `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java#L21-L30` as the direct standalone subclass of that shared test base.
+- Inspect `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTriggeringTest.java#L205-L217`, `#L259-L287`, `#L308-L320`, `#L338-L357`, `#L426-L451`, `#L462-L470` for downstream checkpoint/savepoint behavior using the standalone counter.
+- Inspect `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java#L2167-L2240`, `#L2527-L2567` for `getLast()`-based assertions and concurrent savepoints.
+- Inspect `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorFailureTest.java#L216-L285` for failure-path assertions that also rely on `getLast()`.
+- Inspect `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PerJobCheckpointRecoveryTest.java#L33-L82` for factory behavior around per-job recovery wiring.
+- If you need a new regression test, the most useful addition would be a direct assertion on `getLast()` after `setCount()` in `StandaloneCheckpointIDCounterTest`, but the shared base already covers most of the contract.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounter.java#L28-L68`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointIDCounter.java#L21-L38`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointRecoveryFactory.java#L28-L50`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PerJobCheckpointRecoveryFactory.java#L55-L95`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointIDCounterTestBase.java#L39-L165`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCheckpointIDCounterTest.java#L21-L30`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTriggeringTest.java#L205-L217`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java#L2167-L2240`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorFailureTest.java#L216-L285`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PerJobCheckpointRecoveryTest.java#L33-L82`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/scheduler/SchedulerUtilsTest.java#L76-L86`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/highavailability/TestingHighAvailabilityServicesBuilder.java#L68-L70`
+
+**Uncertainties**
+- I could not verify a separate rendered docs page for standalone checkpoint ID allocation in this local checkout; the only solid version-pinned anchors available here are the 2.2.0 source Javadocs and tests.
+- If you want the answer framed against an external docs URL rather than source comments, that would need a different source of truth than this repository snapshot.

@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.9,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is materially better grounded: it names the version-pinned 2.2.0 source file, relevant runtime call sites, and concrete neighboring tests. B is mostly generic, speculates about files/tests, and omits the runtime anchors needed to change Java code confidently. A still has one potentially overstrong claim about backend support, but it is far less hallucinatory overall.",
+  "critical_issues": {
+    "A": [
+      "Potentially overstates `StateBackend.supportsSavepointFormat(...)` as CANONICAL-only without caveating backend-specific behavior in 2.2.0.",
+      "The 1.13 savepoint-unification note is tangential; it does not directly anchor the 2.2.0 API surface."
+    ],
+    "B": [
+      "Does not anchor the answer in concrete neighboring runtime tests or implementation classes beyond the enum itself.",
+      "Speculates about `SavepointFormatTypeTest` and `CheckpointingOptions` without evidence.",
+      "Lacks the version-specific runtime/docs grounding requested for Flink 2.2.0."
+    ]
+  }
+}

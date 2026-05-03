@@ -1,0 +1,144 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-source-record
+TITLE: Kafka Connect pattern for SourceRecord
+QUESTION:
+For Kafka Connect 4.2.0, inspect `SourceRecord`: inspect source record construction and partition metadata. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the explanation on Kafka 4.2.0 source Javadocs, not a separate docs tree. In this checkout, the closest version-pinned docs are `connect/api/src/main/java/org/apache/kafka/connect/source/package-info.java`, `connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java`, and `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SubmittedRecords.java` because they spell out source-partition/source-offset semantics and how offsets are tracked. `SourceRecord` stores the supplied `sourcePartition` and `sourceOffset` directly and carries them through `newRecord()`, while `kafkaPartition` lives in the `ConnectRecord` superclass.  
+  Citations: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/package-info.java`, `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java#L26-L104`, `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SubmittedRecords.java#L55-L68`, `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/ConnectRecord.java#L34-L135`
+
+**Implementation anchors**
+- `connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java` is the implementation class to cite for construction, accessors, `newRecord()`, and equality/hash behavior.  
+  Citation: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java#L44-L135`
+- `connect/api/src/main/java/org/apache/kafka/connect/connector/ConnectRecord.java` is the superclass anchor for `topic`, `kafkaPartition`, headers, and the generic `newRecord` contract.  
+  Citation: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/ConnectRecord.java#L34-L135`
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SubmittedRecords.java` is the runtime anchor showing `SourceRecord.sourcePartition()` and `sourceOffset()` are the commit keys, and that either may be null.  
+  Citation: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SubmittedRecords.java#L55-L68`
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java` for record construction, partition-specific behavior, offset commit propagation, and `commitRecord()` handling.  
+  Citations: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L320-L349`, `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L573-L700`
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java` for the same metadata in the exactly-once path.  
+  Citations: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java#L164-L169`, `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java#L940-L1008`
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SubmittedRecordsTest.java` for source-partition/source-offset commit tracking, including the null/null edge case.  
+  Citation: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SubmittedRecordsTest.java#L90-L249`
+- Add a dedicated `connect/api/src/test/java/org/apache/kafka/connect/source/SourceRecordTest.java` if you want direct coverage of constructor overloads, `sourcePartition()`, `sourceOffset()`, `newRecord()` propagation, and the fact that the passed maps are not defensively copied.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/package-info.java`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java#L26-L135`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/ConnectRecord.java#L34-L135`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SubmittedRecords.java#L55-L68`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L320-L349`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L573-L700`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java#L164-L169`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java#L940-L1008`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SubmittedRecordsTest.java#L90-L249`
+
+**Uncertainties**
+- I did not find a separate rendered docs tree in this checkout, so the source Javadocs are the version-pinned documentation anchors here.
+- There is no dedicated `SourceRecordTest` in the current tree, so direct constructor/newRecord coverage is missing unless you add it.
+- `SourceRecord` keeps the provided partition/offset maps by reference; there is no defensive copy in the constructor, so mutability is caller-owned.
+
+ANSWER B:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs to frame the API contract, then anchor implementation details in `SourceRecord` itself. The key behavior to verify is that `SourceRecord.newRecord(...)` preserves `sourcePartition` and `sourceOffset` when constructing a new record, while also carrying topic, Kafka partition, schema/value, timestamp, and headers [https://kafka.apache.org/42/kafka-connect/] [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001] [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java].
+
+**Implementation anchors**
+- Public, version-pinned docs:
+  - Kafka Connect landing page for 4.2.0 [https://kafka.apache.org/42/kafka-connect/]
+  - Connector Development Guide for 4.2.0 [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+  - Kafka API page pointing to Connect javadocs [https://kafka.apache.org/42/apis/#part-0003]
+- Implementation class:
+  - `connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java]
+- Code path to cite:
+  - `newRecord(... headers)` delegates to the `SourceRecord(sourcePartition, sourceOffset, topic, kafkaPartition, ...)` constructor, so partition metadata is not recomputed or dropped at that layer [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java]
+
+**Tests to inspect or add**
+- Inspect neighboring source-connect tests that may exercise the same record/offset flow:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SamplePredicate.java` as a nearby `Predicate<SourceRecord>` helper used in source-side runtime tests [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SamplePredicate.java]
+- Add or look for a focused unit test that asserts:
+  - `sourcePartition` is preserved through `newRecord(...)`
+  - `sourceOffset` is preserved through `newRecord(...)`
+  - `kafkaPartition` is set only on the emitted record, not conflated with source partition metadata
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/]
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Docs: [https://kafka.apache.org/42/apis/#part-0003]
+- Implementation: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceRecord.java]
+- Neighboring tests/helpers: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SamplePredicate.java]
+
+**Uncertainties**
+- retrieval system did not surface a dedicated `SourceRecordTest` or a direct unit test specifically asserting partition-metadata preservation, so I would not claim one exists.
+- The evidence is enough to anchor the implementation claim, but not enough to prove the full surrounding test coverage for `SourceRecord` construction.

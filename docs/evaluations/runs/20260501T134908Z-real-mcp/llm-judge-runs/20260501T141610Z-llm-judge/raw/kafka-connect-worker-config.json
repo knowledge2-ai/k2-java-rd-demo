@@ -1,0 +1,33 @@
+{
+  "winner": "A",
+  "confidence": 0.9,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 3,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A stays cautious and mostly correct: it anchors on `WorkerConfig`, the mode-specific subclasses, and relevant neighboring tests without overclaiming exact URLs or file existence. B is more concrete but likely fabricates or misstates anchors: the standalone config path is probably wrong, the integration test is irrelevant, and the repo/doc URLs look unsupported. For an engineer changing Java code, A is safer and more usable.",
+  "critical_issues": {
+    "A": [
+      "Does not name exact version-pinned doc URLs or specific doc pages, so grounding is somewhat soft.",
+      "`WorkerConfigTest.java` is hedged as optional; if it does not exist, the answer is less actionable."
+    ],
+    "B": [
+      "Likely wrong file path for `StandaloneConfig` under a `standalone` subpackage.",
+      "Cites an unrelated integration test as a nearby anchor for `WorkerConfig` parsing.",
+      "The `repo://...` citations and exact 4.2 doc URLs look unsupported and may be fabricated.",
+      "Overstates confidence about direct test coverage without verifying the actual 4.2.0 tree."
+    ]
+  }
+}

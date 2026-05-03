@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.88,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 3
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 4
+    }
+  },
+  "rationale": "A is materially better anchored: it names version-pinned Flink 2.2.0 docs, the `AbstractRestHandler` implementation file, a nearby concrete handler, and adjacent tests. B is cautious but too generic, lacks verified source anchors, and does not identify concrete neighboring tests or module-specific implementation points. A still carries some uncertainty in the exact neighboring test names, but it is far more actionable and grounded.",
+  "critical_issues": {
+    "A": [
+      "Some cited neighboring tests may not be the best exact anchors for the response-body contract.",
+      "Does not spell out the precise generic response-body contract beyond a high-level subtype claim."
+    ],
+    "B": [
+      "No verified citations or source artifacts; explicitly declines grounding.",
+      "Too generic to guide an engineer to the right Flink 2.2.0 classes/tests."
+    ]
+  }
+}

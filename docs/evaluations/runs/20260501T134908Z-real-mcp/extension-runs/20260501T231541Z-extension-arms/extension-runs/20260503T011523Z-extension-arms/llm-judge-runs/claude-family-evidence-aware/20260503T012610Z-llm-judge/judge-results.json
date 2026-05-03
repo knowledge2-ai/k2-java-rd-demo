@@ -1,0 +1,173 @@
+{
+  "answer_sanitization": "explicit_system_identity_terms_normalized",
+  "compared_runs": [
+    "codex_grep_filesystem",
+    "codex_with_k2_mcp_tuned"
+  ],
+  "evidence_mode": "retrieval_snippets_included",
+  "generated_at": "2026-05-03T01:27:07.367127+00:00",
+  "method": "blinded_pairwise_llm_judge_secondary_metric",
+  "model": "sonnet",
+  "provider": "claude-cli",
+  "results": [
+    {
+      "case_id": "kafka-connect-converter",
+      "confidence": 0.72,
+      "critical_issues_by_label": {
+        "A": [
+          "MultiVersionTest citation at L270-L292 is not confirmed by any evidence snippet; risk of wrong line range."
+        ],
+        "B": [
+          "Evidence provided is a single stub snippet; most citations are unverified by supplied evidence.",
+          "Narrowing the answer to StringConverter is an unjustified scope reduction not requested by the question.",
+          "Claim that 'no StringConverterTest.java exists' is unverifiable from supplied evidence and may be stale."
+        ]
+      },
+      "critical_issues_by_run": {
+        "codex_grep_filesystem": [
+          "Evidence provided is a single stub snippet; most citations are unverified by supplied evidence.",
+          "Narrowing the answer to StringConverter is an unjustified scope reduction not requested by the question.",
+          "Claim that 'no StringConverterTest.java exists' is unverifiable from supplied evidence and may be stale."
+        ],
+        "codex_with_k2_mcp_tuned": [
+          "MultiVersionTest citation at L270-L292 is not confirmed by any evidence snippet; risk of wrong line range."
+        ]
+      },
+      "label_to_run": {
+        "A": "codex_with_k2_mcp_tuned",
+        "B": "codex_grep_filesystem"
+      },
+      "question": "For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?",
+      "rationale": "A is better grounded: its Plugins.newConverter citation is confirmed by the evidence snippet showing isKeyConverter detection and classPropertyName prefix logic. A also surfaces ConnectorConfig validators, ConverterType enum, MultiVersionTest, and WorkerConfig config keys\u2014all precise, version-pinned anchors. B is technically sound but its evidence is nearly empty (only a stub Converter.java entry), and its StringConverter focus narrows scope unnecessarily. B's claim about no StringConverterTest existing is unverifiable and adds marginal value.",
+      "scores_by_label": {
+        "A": {
+          "correctness": 5,
+          "grounding": 5,
+          "risk": 4,
+          "specificity": 5,
+          "usefulness": 5
+        },
+        "B": {
+          "correctness": 4,
+          "grounding": 3,
+          "risk": 4,
+          "specificity": 4,
+          "usefulness": 4
+        }
+      },
+      "scores_by_run": {
+        "codex_grep_filesystem": {
+          "correctness": 4,
+          "grounding": 3,
+          "risk": 4,
+          "specificity": 4,
+          "usefulness": 4
+        },
+        "codex_with_k2_mcp_tuned": {
+          "correctness": 5,
+          "grounding": 5,
+          "risk": 4,
+          "specificity": 5,
+          "usefulness": 5
+        }
+      },
+      "title": "Kafka Connect pattern for Converter",
+      "winner_label": "A",
+      "winner_run": "codex_with_k2_mcp_tuned"
+    },
+    {
+      "case_id": "flink-rest-job-plan-handler",
+      "confidence": 0.65,
+      "critical_issues_by_label": {
+        "A": [
+          "Claim that createJobPlanInfo constructs `new JobPlanInfo(executionGraph.getPlan())` is plausible but not directly confirmed by the provided evidence snippets."
+        ],
+        "B": [
+          "States handleRequest() directly returns `new JobPlanInfo(executionGraph.getPlan())` \u2014 evidence shows it returns `createJobPlanInfo(executionGraph)`, conflating the helper with the constructor.",
+          "Evidence for B is only a name stub with no line URI, so cited line ranges cannot be verified against provided snippets."
+        ]
+      },
+      "critical_issues_by_run": {
+        "codex_grep_filesystem": [
+          "States handleRequest() directly returns `new JobPlanInfo(executionGraph.getPlan())` \u2014 evidence shows it returns `createJobPlanInfo(executionGraph)`, conflating the helper with the constructor.",
+          "Evidence for B is only a name stub with no line URI, so cited line ranges cannot be verified against provided snippets."
+        ],
+        "codex_with_k2_mcp_tuned": [
+          "Claim that createJobPlanInfo constructs `new JobPlanInfo(executionGraph.getPlan())` is plausible but not directly confirmed by the provided evidence snippets."
+        ]
+      },
+      "label_to_run": {
+        "A": "codex_with_k2_mcp_tuned",
+        "B": "codex_grep_filesystem"
+      },
+      "question": "For Flink REST API 2.2.0, inspect `JobPlanHandler`: explain how plan metadata is returned through a REST handler. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?",
+      "rationale": "Evidence confirms A's two-step flow: `handleRequest()` \u2192 `createJobPlanInfo(executionGraph)` \u2192 `new JobPlanInfo(...)`. B collapses this by stating `handleRequest()` directly returns `new JobPlanInfo(executionGraph.getPlan())`, skipping the helper and slightly misrepresenting the indirection. A's evidence base is materially stronger: multiple confirmed code snippets vs. B's stub-only evidence. B adds useful versioning detail via `RuntimeMessageHeaders` but its grounding is unconfirmed.",
+      "scores_by_label": {
+        "A": {
+          "correctness": 5,
+          "grounding": 5,
+          "risk": 5,
+          "specificity": 5,
+          "usefulness": 5
+        },
+        "B": {
+          "correctness": 4,
+          "grounding": 3,
+          "risk": 4,
+          "specificity": 5,
+          "usefulness": 4
+        }
+      },
+      "scores_by_run": {
+        "codex_grep_filesystem": {
+          "correctness": 4,
+          "grounding": 3,
+          "risk": 4,
+          "specificity": 5,
+          "usefulness": 4
+        },
+        "codex_with_k2_mcp_tuned": {
+          "correctness": 5,
+          "grounding": 5,
+          "risk": 5,
+          "specificity": 5,
+          "usefulness": 5
+        }
+      },
+      "title": "Flink REST pattern for JobPlanHandler",
+      "winner_label": "A",
+      "winner_run": "codex_with_k2_mcp_tuned"
+    }
+  ],
+  "run_id": "20260503T012610Z-llm-judge",
+  "scorecard_path": "docs/evaluations/runs/20260501T134908Z-real-mcp/extension-runs/20260501T231541Z-extension-arms/extension-runs/20260503T011523Z-extension-arms/extension-scorecard.json",
+  "seed": "k2-llm-judge-v1",
+  "summary": {
+    "case_count": 2,
+    "dimension_averages": {
+      "codex_grep_filesystem": {
+        "correctness": 4.0,
+        "grounding": 3.0,
+        "risk": 4.0,
+        "specificity": 4.5,
+        "usefulness": 4.0
+      },
+      "codex_with_k2_mcp_tuned": {
+        "correctness": 5.0,
+        "grounding": 5.0,
+        "risk": 4.5,
+        "specificity": 5.0,
+        "usefulness": 5.0
+      }
+    },
+    "mean_confidence": 0.685,
+    "tie_rate": 0.0,
+    "win_rates_excluding_ties": {
+      "codex_grep_filesystem": 0.0,
+      "codex_with_k2_mcp_tuned": 1.0
+    },
+    "winner_counts": {
+      "codex_with_k2_mcp_tuned": 2
+    }
+  }
+}

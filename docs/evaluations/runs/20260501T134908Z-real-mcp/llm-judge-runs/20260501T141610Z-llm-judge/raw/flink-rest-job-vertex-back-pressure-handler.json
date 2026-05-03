@@ -1,0 +1,29 @@
+{
+  "winner": "A",
+  "confidence": 0.98,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 1,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "Answer A matches Flink 2.2's actual REST package layout (`org.apache.flink.runtime.rest.handler.job` / `...rest.messages`) and cites the dedicated `JobVertexBackPressureHandlerTest`, plus the version-pinned REST docs. Answer B is materially wrong on the implementation/test package (`webmonitor/handlers`), which is a strong hallucination signal, and its neighboring tests are generic/speculative.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Uses the wrong package path (`org.apache.flink.runtime.webmonitor.handlers`) instead of the 2.2 REST handler path under `org.apache.flink.runtime.rest.handler.job`.",
+      "Cites speculative neighboring tests rather than the dedicated `JobVertexBackPressureHandlerTest` and `JobVertexBackPressureHeaders` anchors.",
+      "Provides vague uncertainty where the versioned source layout is actually well-defined."
+    ]
+  }
+}

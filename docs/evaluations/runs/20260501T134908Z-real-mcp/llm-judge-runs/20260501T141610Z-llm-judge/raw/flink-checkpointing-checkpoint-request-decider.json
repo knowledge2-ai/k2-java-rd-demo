@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.86,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better anchored to Flink 2.2.0 by naming the runtime class, version-pinned docs, and the direct neighboring unit test. It also states uncertainty where source detail is not fully verified. B is much vaguer, adds unsupported scheduling claims and extra test targets without grounding, and admits it has not inspected the source. A is still somewhat speculative on branch details, but materially safer.",
+  "critical_issues": {
+    "A": [
+      "Some method/branch details are inferred rather than directly shown, so the exact decision predicates may be overstated.",
+      "The claim about specific test behavior like `chooseRequestToExecute`/`chooseQueuedRequestToExecute` may need source confirmation."
+    ],
+    "B": [
+      "Too vague for an engineer changing Java code: no concrete branch logic, methods, or test anchors beyond file names.",
+      "Adds unsupported claims about scheduler enable/disable state and coalescing that may not match the 2.2.0 API.",
+      "Lacks version-specific grounding beyond one docs URL and does not identify the most relevant neighboring tests with confidence."
+    ]
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "answer_sanitization": "explicit_system_identity_terms_normalized",
+  "compared_runs": [
+    "codex_grep_filesystem",
+    "codex_with_k2_mcp_tuned"
+  ],
+  "generated_at": "2026-05-02T23:53:20.169748+00:00",
+  "method": "blinded_pairwise_llm_judge_secondary_metric",
+  "model": "sonnet",
+  "provider": "claude-cli",
+  "results": [
+    {
+      "case_id": "kafka-connect-converter",
+      "confidence": 0.72,
+      "critical_issues_by_label": {
+        "A": [
+          "Names newInternalConverter; Plugins.java exposes both newConverter and newInternalConverter \u2014 the primary public entry point is newConverter, so the distinction matters for an engineer tracing the key/value path",
+          "Test anchors are file-level only (no method names), reducing actionability",
+          "Omits WorkerConfig/ConnectorConfig as source-level config doc anchors, relying solely on external URL citations"
+        ],
+        "B": [
+          "Specific line numbers (e.g., Plugins.java#L457-L476, MultiVersionTest#L260-L285) cannot be verified and may be hallucinated or stale",
+          "MultiVersionTest.testVersionedConverter method name is unverified and could be fabricated",
+          "Acknowledges JsonConverter absence but still references it implicitly, creating a minor gap"
+        ]
+      },
+      "critical_issues_by_run": {
+        "codex_grep_filesystem": [
+          "Specific line numbers (e.g., Plugins.java#L457-L476, MultiVersionTest#L260-L285) cannot be verified and may be hallucinated or stale",
+          "MultiVersionTest.testVersionedConverter method name is unverified and could be fabricated",
+          "Acknowledges JsonConverter absence but still references it implicitly, creating a minor gap"
+        ],
+        "codex_with_k2_mcp_tuned": [
+          "Names newInternalConverter; Plugins.java exposes both newConverter and newInternalConverter \u2014 the primary public entry point is newConverter, so the distinction matters for an engineer tracing the key/value path",
+          "Test anchors are file-level only (no method names), reducing actionability",
+          "Omits WorkerConfig/ConnectorConfig as source-level config doc anchors, relying solely on external URL citations"
+        ]
+      },
+      "label_to_run": {
+        "A": "codex_with_k2_mcp_tuned",
+        "B": "codex_grep_filesystem"
+      },
+      "question": "For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?",
+      "rationale": "B is more complete: it adds StringConverter (the canonical key/value-branching example in connect/api), correctly names Plugins.newConverter vs A's newInternalConverter, and anchors config docs in WorkerConfig/ConnectorConfig source rather than external URLs. B's PluginsTest method names and ErrorHandlingTaskTest/MultiVersionTest citations give engineers precise jump points. Line-number specificity raises hallucination risk for B, but the class-level reasoning is sounder.",
+      "scores_by_label": {
+        "A": {
+          "correctness": 4,
+          "grounding": 4,
+          "risk": 4,
+          "specificity": 3,
+          "usefulness": 4
+        },
+        "B": {
+          "correctness": 4,
+          "grounding": 5,
+          "risk": 3,
+          "specificity": 5,
+          "usefulness": 5
+        }
+      },
+      "scores_by_run": {
+        "codex_grep_filesystem": {
+          "correctness": 4,
+          "grounding": 5,
+          "risk": 3,
+          "specificity": 5,
+          "usefulness": 5
+        },
+        "codex_with_k2_mcp_tuned": {
+          "correctness": 4,
+          "grounding": 4,
+          "risk": 4,
+          "specificity": 3,
+          "usefulness": 4
+        }
+      },
+      "title": "Kafka Connect pattern for Converter",
+      "winner_label": "B",
+      "winner_run": "codex_grep_filesystem"
+    },
+    {
+      "case_id": "flink-rest-job-plan-handler",
+      "confidence": 0.85,
+      "critical_issues_by_label": {
+        "A": [
+          "Omits JobPlanHeaders \u2014 the REST contract class that defines HTTP method, URL, and response type",
+          "Omits JsonPlanGenerator \u2014 the class that populates plan metadata from the job graph",
+          "Omits WebMonitorEndpoint registration anchor",
+          "Does not describe handleRequest body or the executionGraph.getPlan() call path",
+          "Suggested neighboring tests (JobsOverviewHandlerTest, JobConfigHandlerTest) are less directly relevant than JobPlanInfoTest or JsonGeneratorTest"
+        ],
+        "B": [
+          "Specific line numbers (e.g., #L44-L79, #L411-L418) cannot be independently verified and may be imprecise",
+          "flink-docs module class names (RuntimeRestAPIDocGenerator, RuntimeOpenApiSpecGenerator) are plausible but not verifiable without source access"
+        ]
+      },
+      "critical_issues_by_run": {
+        "codex_grep_filesystem": [
+          "Specific line numbers (e.g., #L44-L79, #L411-L418) cannot be independently verified and may be imprecise",
+          "flink-docs module class names (RuntimeRestAPIDocGenerator, RuntimeOpenApiSpecGenerator) are plausible but not verifiable without source access"
+        ],
+        "codex_with_k2_mcp_tuned": [
+          "Omits JobPlanHeaders \u2014 the REST contract class that defines HTTP method, URL, and response type",
+          "Omits JsonPlanGenerator \u2014 the class that populates plan metadata from the job graph",
+          "Omits WebMonitorEndpoint registration anchor",
+          "Does not describe handleRequest body or the executionGraph.getPlan() call path",
+          "Suggested neighboring tests (JobsOverviewHandlerTest, JobConfigHandlerTest) are less directly relevant than JobPlanInfoTest or JsonGeneratorTest"
+        ]
+      },
+      "label_to_run": {
+        "A": "codex_with_k2_mcp_tuned",
+        "B": "codex_grep_filesystem"
+      },
+      "question": "For Flink REST API 2.2.0, inspect `JobPlanHandler`: explain how plan metadata is returned through a REST handler. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?",
+      "rationale": "B names the complete class chain (JobPlanHandler \u2192 JobPlanHeaders \u2192 JobPlanInfo \u2192 JsonPlanGenerator \u2192 WebMonitorEndpoint registration) with line-anchored source refs, explains the actual handleRequest flow (executionGraph.getPlan() \u2192 JobPlanInfo), pins tests to direct serialization coverage (JobPlanInfoTest, JsonGeneratorTest), and correctly surfaces the flink-docs doc-generator path. A omits JobPlanHeaders, JsonPlanGenerator, and WebMonitorEndpoint entirely, and its suggested tests are less directly related. Specific line numbers in B carry some hallucination risk but class names and flow are consistent with Flink 2.x architecture.",
+      "scores_by_label": {
+        "A": {
+          "correctness": 3,
+          "grounding": 3,
+          "risk": 4,
+          "specificity": 3,
+          "usefulness": 3
+        },
+        "B": {
+          "correctness": 5,
+          "grounding": 5,
+          "risk": 4,
+          "specificity": 5,
+          "usefulness": 5
+        }
+      },
+      "scores_by_run": {
+        "codex_grep_filesystem": {
+          "correctness": 5,
+          "grounding": 5,
+          "risk": 4,
+          "specificity": 5,
+          "usefulness": 5
+        },
+        "codex_with_k2_mcp_tuned": {
+          "correctness": 3,
+          "grounding": 3,
+          "risk": 4,
+          "specificity": 3,
+          "usefulness": 3
+        }
+      },
+      "title": "Flink REST pattern for JobPlanHandler",
+      "winner_label": "B",
+      "winner_run": "codex_grep_filesystem"
+    }
+  ],
+  "run_id": "20260502T235228Z-llm-judge",
+  "scorecard_path": "docs/evaluations/runs/20260501T134908Z-real-mcp/extension-runs/20260501T231541Z-extension-arms/extension-runs/20260502T234443Z-extension-arms/extension-scorecard.json",
+  "seed": "k2-llm-judge-v1",
+  "summary": {
+    "case_count": 2,
+    "dimension_averages": {
+      "codex_grep_filesystem": {
+        "correctness": 4.5,
+        "grounding": 5.0,
+        "risk": 3.5,
+        "specificity": 5.0,
+        "usefulness": 5.0
+      },
+      "codex_with_k2_mcp_tuned": {
+        "correctness": 3.5,
+        "grounding": 3.5,
+        "risk": 4.0,
+        "specificity": 3.0,
+        "usefulness": 3.5
+      }
+    },
+    "mean_confidence": 0.785,
+    "tie_rate": 0.0,
+    "win_rates_excluding_ties": {
+      "codex_grep_filesystem": 1.0,
+      "codex_with_k2_mcp_tuned": 0.0
+    },
+    "winner_counts": {
+      "codex_grep_filesystem": 2
+    }
+  }
+}

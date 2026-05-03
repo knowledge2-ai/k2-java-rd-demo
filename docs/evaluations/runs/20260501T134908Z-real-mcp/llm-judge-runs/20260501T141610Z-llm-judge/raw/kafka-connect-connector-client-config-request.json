@@ -1,0 +1,29 @@
+{
+  "winner": "A",
+  "confidence": 0.93,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better grounded in Kafka Connect 4.2.0 docs, names the concrete runtime implementation that consumes `ConnectorClientConfigRequest.clientProps()`, and points to plausible neighboring tests. B is weaker because it relies on a generic docs page, omits the key abstract policy class, and likely invents a `ConnectorClientConfigRequestTest` path without support.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Uses a generic `docs/connect.html` anchor instead of a version-pinned docs URI, reducing source precision.",
+      "Suggests `connect/api/src/test/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigRequestTest.java`, which may not exist.",
+      "Misses the key implementation anchor `AbstractConnectorClientConfigOverridePolicy`, which is the class that actually consumes `clientProps()`."
+    ]
+  }
+}

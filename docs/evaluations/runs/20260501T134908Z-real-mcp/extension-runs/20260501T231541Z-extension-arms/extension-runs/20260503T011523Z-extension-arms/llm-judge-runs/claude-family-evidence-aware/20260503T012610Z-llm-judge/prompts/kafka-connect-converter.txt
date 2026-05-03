@@ -1,0 +1,328 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- If evidence snippets are provided, use them to verify cited methods/classes. Do not call a cited method fabricated when the evidence snippet contains that method.
+- If a cited claim is not supported by either the answer text or provided evidence, treat that as risk. Do not rely on general prior expectations over concrete evidence.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-converter
+TITLE: Kafka Connect pattern for Converter
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+
+Anchor the answer on the `Converter` interface contract plus the runtime wiring in `Plugins.newConverter(...)`. The key/value split is not handled by one shared converter instance: Connect selects a converter for `key.converter` and `value.converter`, treats absence of the property as “no override,” and configures the chosen plugin with the old-style prefix `key.converter.` or `value.converter.` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java#L455-L497], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L692-L726].
+
+**Implementation anchors**
+
+- `Converter` is the public interface to cite first for the contract itself: it is the target abstraction for value/key conversion behavior [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java].
+- `Plugins.newConverter(...)` is the concrete selection path: it checks whether the config contains the converter property, infers key vs value from `WorkerConfig.KEY_CONVERTER_CLASS_CONFIG`, and builds `converterConfig` with `classPropertyName + "."` before instantiating the plugin [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java#L455-L497].
+- `WorkerConfig` is the version-pinned docs anchor for the public keys: `KEY_CONVERTER_CLASS_CONFIG`/`VALUE_CONVERTER_CLASS_CONFIG` and their docs explain that these control serialization format for record keys and values [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L73-L103].
+- `ConnectorConfig` adds the versioned-plugin side of the story with `KEY_CONVERTER_VERSION_CONFIG` and `VALUE_CONVERTER_VERSION_CONFIG`, plus validators that require a concrete `Converter` implementation [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L99-L129].
+- `ConverterConfig` and `ConverterType` define the implementation-level type switch: `converter.type` is limited to `key`, `value`, or `header`, and `ConverterType.KEY/VALUE/HEADER` is the exact enum source [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/ConverterConfig.java#L21-L51], [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/ConverterType.java#L20-L50].
+
+**Tests to inspect or add**
+
+- `MultiVersionTest` is the strongest neighboring test for versioned converter loading; it asserts separate key and value converters are resolved and that each exposes the expected versioned plugin behavior [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L270-L292].
+- `WorkerSinkTaskTest` exercises `toConnectData(...)` for key/value conversion in the sink path, so it is the closest runtime consumer-side neighbor [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java].
+- `AbstractWorkerSourceTaskTest` exercises `fromConnectData(...)` for source records, so it is the closest producer-side neighbor [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java].
+- `NumberConverterTest` is the best template if you need to add or tighten converter-specific behavior tests around schemas, null handling, and round trips [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/NumberConverterTest.java].
+
+**Citations**
+
+- `Converter`: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java]
+- `Plugins.newConverter(...)`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java#L455-L497]
+- `WorkerConfig`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L73-L103]
+- `ConnectorConfig`: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L99-L129]
+- `ConverterConfig`: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/ConverterConfig.java#L21-L51]
+- `ConverterType`: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/ConverterType.java#L20-L50]
+- `Worker.java` consumer wiring: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L692-L726]
+- `MultiVersionTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L270-L292]
+- `WorkerSinkTaskTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java]
+- `AbstractWorkerSourceTaskTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java]
+- `NumberConverterTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/NumberConverterTest.java]
+
+**Uncertainties**
+
+- I did not retrieve a separate prose docs page for `Converter`; the retrieved evidence anchors the public contract through code and config docs instead.
+
+EVIDENCE FOR ANSWER A:
+[
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/kafka-connect/index.html",
+    "snippet": "Title: Kafka Connect | Apache Kafka\nURL: https://kafka.apache.org/42/kafka-connect/\nRepository: apache/kafka-site\nRef: 4.2\nPath: 42/kafka-connect/index.html\nFramework: kafka 4.2.0\nSource kind: docs\nAPI surface: connect\n\nKafka Connect\nOverview\nOverview\nUser Guide\nUser Guide\nConnector Development Guide\nConnector Development Guide\nAdministration\nAdministration\nLast modified February 16, 2026: Add 4.2 documentation and javadocs (#785) (956020bebd)",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/kafka-connect/"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/kafka-connect/connector-development-guide/index.html",
+    "snippet": "Title: Connector Development Guide | Apache Kafka\nURL: https://kafka.apache.org/42/kafka-connect/connector-development-guide/\nRepository: apache/kafka-site\nRef: 4.2\nPath: 42/kafka-connect/connector-development-guide/index.html\nFramework: kafka 4.2.0\nSource kind: docs\nAPI surface: connect\n\nConnector Development Guide\nConnector Development Guide\nThis guide describes how developers can write new connectors for Kafka Connect to move data between Kafka and other systems. It briefly reviews a few key concepts and then describes how to create a simple connector.\nCore Concepts and APIs\nConnectors and Tasks\nTo copy data between Kafka and another system, users create a Connector for the system they wa",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/configuration/kafka-connect-configs/index.html",
+    "snippet": "org.apache.kafka.connect.runtime.ConnectorConfig$PluginVersionValidator@3f8f9dd6\nImportance:\nlow\n-\nvalue.converter\nConverter class used to convert between Kafka Connect format and the serialized form that is written to Kafka. This controls the format of the values in messages written to or read from Kafka, and since this is independent of connectors it allows any connector to work with any serialization format. Examples of common formats include JSON and Avro.\nType:\nclass\nDefault:\nnull\nValid Values:\nA concrete subclass of org.apache.kafka.connect.storage.Converter, A class with a public, no-argument constructor\nImportance:\nlow\n-\nvalue.converter.plugin.version\nVersion of the value converter.\n",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/configuration/kafka-connect-configs/index.html",
+    "snippet": "A concrete subclass of org.apache.kafka.connect.storage.Converter, A class with a public, no-argument constructor\nImportance:\nlow\n-\nkey.converter.plugin.version\nVersion of the key converter.\nType:\nstring\nDefault:\nnull\nValid Values:\norg.apache.kafka.connect.runtime.ConnectorConfig$PluginVersionValidator@48533e64\nImportance:\nlow\n-\nvalue.converter\nConverter class used to convert between Kafka Connect format and the serialized form that is written to Kafka. This controls the format of the values in messages written to or read from Kafka, and since this is independent of connectors it allows any connector to work with any serialization format. Examples of common formats include JSON and Avro.\nTyp",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0047"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/configuration/mirrormaker-configs/index.html",
+    "snippet": "Converter class used to convert between Kafka Connect format and the serialized form that is written to Kafka. This controls the format of the values in messages written to or read from Kafka, and since this is independent of connectors it allows any connector to work with any serialization format. Examples of common formats include JSON and Avro.\nType:\nclass\nDefault:\nnull\nValid Values:\nA concrete subclass of org.apache.kafka.connect.storage.Converter, A class with a public, no-argument constructor\nImportance:\nlow\n-\nvalue.converter.plugin.version\nVersion of the value converter.\nType:\nstring\nDefault:\nnull\nValid Values:\norg.apache.kafka.connect.runtime.ConnectorConfig$PluginVersionValidator@1f",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/configuration/mirrormaker-configs/#part-0024"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/configuration/kafka-connect-configs/index.html",
+    "snippet": "Converter class used to convert between Kafka Connect format and the serialized form that is written to Kafka. This controls the format of the keys in messages written to or read from Kafka, and since this is independent of connectors it allows any connector to work with any serialization format. Examples of common formats include JSON and Avro.\nType:\nclass\nDefault:\nValid Values:\nImportance:\nhigh\n-\noffset.storage.topic\nThe name of the Kafka topic where source connector offsets are stored\nType:\nstring\nDefault:\nValid Values:\nImportance:\nhigh\n-\nstatus.storage.topic\nThe name of the Kafka topic where connector and task status are stored\nType:\nstring\nDefault:\nValid Values:\nImportance:\nhigh\n-\nvalue",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0002"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/configuration/kafka-connect-configs/index.html",
+    "snippet": "org.apache.kafka.connect.runtime.ConnectorConfig$PluginVersionValidator@7e774085\nImportance:\nmedium\n-\ntasks.max\nMaximum number of tasks to use for this connector.\nType:\nint\nDefault:\n1\nValid Values:\n[1,...]\nImportance:\nhigh\n-\ntasks.max.enforce\n(Deprecated) Whether to enforce that the tasks.max property is respected by the connector. By default, connectors that generate too many tasks will fail, and existing sets of tasks that exceed the tasks.max property will also be failed. If this property is set to false, then connectors will be allowed to generate more than the maximum number of tasks, and existing sets of tasks that exceed the tasks.max property will be allowed to run. This property is ",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0039"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": null,
+    "line_source_uri": null,
+    "module": "docs",
+    "path": "42/configuration/kafka-connect-configs/index.html",
+    "snippet": "HeaderConverter class used to convert between Kafka Connect format and the serialized form that is written to Kafka. This controls the format of the header values in messages written to or read from Kafka, and since this is independent of connectors it allows any connector to work with any serialization format. Examples of common formats include JSON and Avro. By default, the SimpleHeaderConverter is used to serialize header values to strings and deserialize them by inferring the schemas.\nType:\nclass\nDefault:\nnull\nValid Values:\nA concrete subclass of org.apache.kafka.connect.storage.HeaderConverter, A class with a public, no-argument constructor\nImportance:\nlow\n-\nheader.converter.plugin.vers",
+    "source_kind": "docs",
+    "source_uri": "https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0048"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "ConnectorConfig",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L99-L129",
+    "module": "connect",
+    "path": "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java",
+    "snippet": "99:     public static final String KEY_CONVERTER_CLASS_DISPLAY = \"Key converter class\";\n100:     private static final ConfigDef.Validator KEY_CONVERTER_CLASS_VALIDATOR = ConfigDef.CompositeValidator.of(\n101:             ConcreteSubClassValidator.forSuperClass(Converter.class),\n102:             new InstantiableClassValidator()\n103:     );\n104: \n105:     public static final String KEY_CONVERTER_VERSION_CONFIG = WorkerConfig.KEY_CONVERTER_VERSION;\n106:     private static final String KEY_CONVERTER_VERSION_DOC = \"Version of the key converter.\";\n107:     private static final String KEY_CONVERTER_VERSION_DISPLAY = \"Key converter version\";\n108:     private static final ConfigDef.Validator KEY_CONVE",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "SaslConfigs",
+    "line_source_uri": "repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/SaslConfigs.java#L302-L344",
+    "module": "clients",
+    "path": "clients/src/main/java/org/apache/kafka/common/config/SaslConfigs.java",
+    "snippet": "302:     public static final String SASL_OAUTHBEARER_SCOPE_CLAIM_NAME = \"sasl.oauthbearer.scope.claim.name\";\n303:     public static final String DEFAULT_SASL_OAUTHBEARER_SCOPE_CLAIM_NAME = \"scope\";\n304:     public static final String SASL_OAUTHBEARER_SCOPE_CLAIM_NAME_DOC = \"The OAuth claim for the scope is often named \\\"\" + DEFAULT_SASL_OAUTHBEARER_SCOPE_CLAIM_NAME + \"\\\", but this (optional)\"\n305:             + \" setting can provide a different name to use for the scope included in the JWT payload's claims if the OAuth/OIDC provider uses a different\"\n306:             + \" name for that claim.\";\n307: \n308:     public static final String SASL_OAUTHBEARER_SUB_CLAIM_NAME = \"sasl.oauthbearer.sub.c",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/SaslConfigs.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "IntegerConverter",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/IntegerConverter.java#L22-L37",
+    "module": "connect",
+    "path": "connect/runtime/src/main/java/org/apache/kafka/connect/converters/IntegerConverter.java",
+    "snippet": "22: import org.apache.kafka.connect.storage.Converter;\n23: import org.apache.kafka.connect.storage.HeaderConverter;\n24: \n25: /**\n26:  * {@link Converter} and {@link HeaderConverter} implementation that only supports serializing to and deserializing from integer values.\n27:  * It does support handling nulls. When converting from bytes to Kafka Connect format, the converter will always return an\n28:  * optional INT32 schema.\n29:  * <p>\n30:  * This implementation currently does nothing with the topic names or header keys.\n31:  */\n32: public class IntegerConverter extends NumberConverter<Integer> {\n33: \n34:     public IntegerConverter() {\n35:         super(\"integer\", Schema.OPTIONAL_INT32_SCHEMA",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/IntegerConverter.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "Plugins",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java#L455-L497",
+    "module": "connect",
+    "path": "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java",
+    "snippet": "455:     }\n456: \n457:     private Converter newConverter(AbstractConfig config, String classPropertyName, String versionPropertyName, ClassLoaderUsage classLoaderUsage) {\n458:         if (!config.originals().containsKey(classPropertyName)) {\n459:             // This configuration does not define the converter via the specified property name\n460:             return null;\n461:         }\n462:         // Determine whether this is a key or value converter based upon the supplied property name ...\n463:         final boolean isKeyConverter = WorkerConfig.KEY_CONVERTER_CLASS_CONFIG.equals(classPropertyName);\n464: \n465:         // Configure the Converter using only the old configuration mechanism ...",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "Worker",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L692-L726",
+    "module": "connect",
+    "path": "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java",
+    "snippet": "692: \n693:                     final TaskConfig taskConfig = new TaskConfig(taskProps);\n694:                     final Class<? extends Task> taskClass = taskConfig.getClass(TaskConfig.TASK_CLASS_CONFIG).asSubclass(Task.class);\n695:                     final Task task = plugins.newTask(taskClass);\n696:                     log.info(\"Instantiated task {} with version {} of type {}\", id, task.version(), taskClass.getName());\n697: \n698: \n699:                     // By maintaining connector's specific class loader for this thread here, we first\n700:                     // search for converters within the connector dependencies.\n701:                     // If any of these aren't found, that means t",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "BooleanConverter",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/BooleanConverter.java#L67-L97",
+    "module": "connect",
+    "path": "connect/runtime/src/main/java/org/apache/kafka/connect/converters/BooleanConverter.java",
+    "snippet": "67:             isKey ? ConverterType.KEY.getName() : ConverterType.VALUE.getName());\n68:         configure(conf);\n69:     }\n70: \n71:     @Override\n72:     public byte[] fromConnectData(String topic, Schema schema, Object value) {\n73:         if (schema != null && schema.type() != Type.BOOLEAN)\n74:             throw new DataException(\"Invalid schema type for BooleanConverter: \" + schema.type().toString());\n75: \n76:         try {\n77:             return serializer.serialize(topic, (Boolean) value);\n78:         } catch (ClassCastException e) {\n79:             throw new DataException(\"BooleanConverter is not compatible with objects of type \" + value.getClass());\n80:         }\n81:     }\n82: \n83: ",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/BooleanConverter.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "ByteArrayConverter",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/ByteArrayConverter.java#L52-L82",
+    "module": "connect",
+    "path": "connect/runtime/src/main/java/org/apache/kafka/connect/converters/ByteArrayConverter.java",
+    "snippet": "52:     }\n53: \n54:     @Override\n55:     public void configure(Map<String, ?> configs, boolean isKey) {\n56:     }\n57: \n58:     @Override\n59:     public byte[] fromConnectData(String topic, Schema schema, Object value) {\n60:         if (schema != null && schema.type() != Schema.Type.BYTES)\n61:             throw new DataException(\"Invalid schema type for ByteArrayConverter: \" + schema.type().toString());\n62: \n63:         if (value != null && !(value instanceof byte[]) && !(value instanceof ByteBuffer))\n64:             throw new DataException(\"ByteArrayConverter is not compatible with objects of type \" + value.getClass());\n65: \n66:         return value instanceof ByteBuffer ? getBytesFromByteBu",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/converters/ByteArrayConverter.java"
+  },
+  {
+    "api_surface": "connect",
+    "class_name": "ExactlyOnceSourceIntegrationTest",
+    "line_source_uri": "repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java#L1084-L1126",
+    "module": "connect",
+    "path": "connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java",
+    "snippet": "1084:             } catch (NumberFormatException e) {\n1085:                 throw new AssertionError(\"Task ID in key should be an integer, was '\" + split[1] + \"'\", e);\n1086:             }\n1087: \n1088:             long seqno;\n1089:             try {\n1090:                 seqno = Long.parseLong(split[2], 10);\n1091:             } catch (NumberFormatException e) {\n1092:                 throw new AssertionError(\"Seqno in key should be a long, was '\" + split[2] + \"'\", e);\n1093:             }\n1094: \n1095:             result.computeIfAbsent(taskId, t -> new ArrayList<>()).add(seqno);\n1096:         }\n1097:         return result;\n1098:     }\n1099: \n1100:     private Map<Integer, List<Long>> parseOffse",
+    "source_kind": "test",
+    "source_uri": "repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java"
+  }
+]
+
+ANSWER B:
+**Recommendation**
+- Anchor the explanation on source Javadocs, not a separate rendered docs tree. In this checkout, the authoritative version-pinned docs for converter behavior are the API comments in `Converter`, `ConverterConfig`, `StringConverterConfig`, and `StringConverter`.
+- The key/value split is config-time, not conversion-time: `Converter.configure(Map, boolean)` marks a converter as key or value, and `StringConverter.configure(Map, boolean)` just stores `converter.type` before delegating. The actual `fromConnectData` / `toConnectData` logic is identical for key and value and ignores schema.
+- For runtime wiring, `Worker` creates key and value converters separately, first from connector config and then falling back to worker config.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java` for the interface contract, including the header-aware defaults delegating to the 3-arg methods.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/ConverterConfig.java` for `converter.type` and the allowed `key` / `value` / `header` modes.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/StringConverterConfig.java` for the encoding config and inherited type config.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/StringConverter.java` for the actual key/value behavior.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java` for the key/value converter resolution path.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java` for direct assertions that key and value converters are invoked separately with headers and schemas.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java` for the shared helper coverage around key/value conversion and failure paths.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectWorkerIntegrationTest.java` for end-to-end source-connector behavior using `StringConverter` and alias resolution.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` and `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ErrorHandlingTaskTest.java` for connector config and error-handling scenarios that still wire `StringConverter` on both sides.
+- If you want a fast unit regression, add a dedicated `StringConverterTest`; there is no existing `StringConverterTest.java` in this checkout. The nearest converter-test patterns are `ByteArrayConverterTest.java` and `NumberConverterTest.java`.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java#L28-L98`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/ConverterConfig.java#L28-L57`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/StringConverterConfig.java#L27-L60`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/StringConverter.java#L33-L117`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L699-L724`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L602-L620`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java#L902-L918`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectWorkerIntegrationTest.java#L1333-L1376`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java#L566-L590`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ErrorHandlingTaskTest.java#L200-L202`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/ByteArrayConverterTest.java#L1-L110`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/NumberConverterTest.java#L1-L100`
+
+**Uncertainties**
+- I did not find a separate rendered docs tree in this checkout, so I used source Javadocs as the version-pinned documentation anchor.
+- I did not find a dedicated `StringConverterTest.java`; if you want direct unit coverage, that test would need to be added.
+
+EVIDENCE FOR ANSWER B:
+[
+  {
+    "api_surface": "connect",
+    "class_name": "Converter",
+    "line_source_uri": null,
+    "module": "connect",
+    "path": "connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java",
+    "snippet": "Converter",
+    "source_kind": "code",
+    "source_uri": "repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/storage/Converter.java"
+  }
+]

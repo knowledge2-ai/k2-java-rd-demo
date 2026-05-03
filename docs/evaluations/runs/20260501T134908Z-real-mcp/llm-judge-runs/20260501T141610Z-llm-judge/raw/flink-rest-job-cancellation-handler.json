@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.95,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A names the version-pinned REST docs, the exact 2.2.0 runtime handler, and concrete neighboring tests, with uncertainty noted. B stays generic, omits exact versioned doc/test anchors, and introduces weaker speculation about async-style response semantics that does not fit the documented cancel endpoint.",
+  "critical_issues": {
+    "A": [
+      "Does not explicitly state the REST endpoint contract as PATCH /jobs/:jobid with 202 Accepted and empty response body.",
+      "Adjacency choices are plausible but not as tightly anchored as the handler/test pair."
+    ],
+    "B": [
+      "Fails to name concrete version-pinned docs or specific neighboring tests, which was the core ask.",
+      "Uses vague wording about request/ack and async-operation responses instead of the actual cancel endpoint contract.",
+      "Does not provide enough implementation anchors for an engineer to inspect or change Java code safely."
+    ]
+  }
+}

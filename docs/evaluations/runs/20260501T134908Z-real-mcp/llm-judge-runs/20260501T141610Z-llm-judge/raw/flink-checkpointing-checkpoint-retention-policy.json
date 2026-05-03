@@ -1,0 +1,33 @@
+{
+  "winner": "B",
+  "confidence": 0.84,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 2
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    }
+  },
+  "rationale": "B is better anchored to Flink 2.2.0 with version-pinned docs, the exact runtime class, and neighboring tests, while explicitly limiting claims it cannot verify. A is broader and more speculative, with weaker version grounding and a dubious “equivalent internal path” framing. Both are imperfect, but B is more actionable and lower risk for an engineer inspecting the codebase.",
+  "critical_issues": {
+    "A": [
+      "Does not anchor the answer to version-pinned Flink 2.2.0 docs.",
+      "Mentions an “equivalent internal” retention path without source-backed confirmation.",
+      "Test guidance is vague and not tied to specific neighboring tests beyond one class."
+    ],
+    "B": [
+      "Includes one likely noisy doc anchor (`state_backends`) that may be less relevant to retention policy itself.",
+      "Cites tests that are plausible but not proven to be the closest neighbors without source inspection.",
+      "Does not name the exact enum constants, only the surrounding behavior."
+    ]
+  }
+}

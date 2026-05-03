@@ -1,0 +1,178 @@
+{
+  "answer_sanitization": "explicit_system_identity_terms_normalized",
+  "compared_runs": [
+    "codex_grep_filesystem",
+    "codex_with_k2_mcp_tuned"
+  ],
+  "generated_at": "2026-05-02T23:52:13.925600+00:00",
+  "method": "blinded_pairwise_llm_judge_secondary_metric",
+  "model": "gpt-5.4-mini",
+  "provider": "codex-cli",
+  "results": [
+    {
+      "case_id": "kafka-connect-converter",
+      "confidence": 0.83,
+      "critical_issues_by_label": {
+        "A": [
+          "Focuses more on runtime wiring than the concrete converter implementation, so it is slightly less direct than ideal."
+        ],
+        "B": [
+          "Likely wrong path for StringConverter: it is not in connect/api in Kafka Connect.",
+          "Leans on source comments in WorkerConfig/ConnectorConfig instead of version-pinned docs.",
+          "Includes broader tests that are less clearly neighboring to Converter key/value behavior."
+        ]
+      },
+      "critical_issues_by_run": {
+        "codex_grep_filesystem": [
+          "Likely wrong path for StringConverter: it is not in connect/api in Kafka Connect.",
+          "Leans on source comments in WorkerConfig/ConnectorConfig instead of version-pinned docs.",
+          "Includes broader tests that are less clearly neighboring to Converter key/value behavior."
+        ],
+        "codex_with_k2_mcp_tuned": [
+          "Focuses more on runtime wiring than the concrete converter implementation, so it is slightly less direct than ideal."
+        ]
+      },
+      "label_to_run": {
+        "A": "codex_with_k2_mcp_tuned",
+        "B": "codex_grep_filesystem"
+      },
+      "question": "For Kafka Connect 4.2.0, inspect `Converter`: inspect value/key conversion behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?",
+      "rationale": "A is better anchored to Kafka 4.2 versioned docs and the actual Connect runtime/converter split, with a plausible test set and explicit uncertainty. B is more verbose but has a likely wrong source path for StringConverter, relies on source comments instead of version-pinned docs, and mixes in broader tests that are not clearly neighboring to Converter behavior.",
+      "scores_by_label": {
+        "A": {
+          "correctness": 4,
+          "grounding": 4,
+          "risk": 4,
+          "specificity": 4,
+          "usefulness": 4
+        },
+        "B": {
+          "correctness": 2,
+          "grounding": 3,
+          "risk": 2,
+          "specificity": 4,
+          "usefulness": 3
+        }
+      },
+      "scores_by_run": {
+        "codex_grep_filesystem": {
+          "correctness": 2,
+          "grounding": 3,
+          "risk": 2,
+          "specificity": 4,
+          "usefulness": 3
+        },
+        "codex_with_k2_mcp_tuned": {
+          "correctness": 4,
+          "grounding": 4,
+          "risk": 4,
+          "specificity": 4,
+          "usefulness": 4
+        }
+      },
+      "title": "Kafka Connect pattern for Converter",
+      "winner_label": "A",
+      "winner_run": "codex_with_k2_mcp_tuned"
+    },
+    {
+      "case_id": "flink-rest-job-plan-handler",
+      "confidence": 0.66,
+      "critical_issues_by_label": {
+        "A": [
+          "Does not pin the contract to the concrete message/header classes as explicitly as it could.",
+          "Neighboring tests are plausible but not the most direct proof for JobPlanHandler behavior.",
+          "Treats archival imports as suggestive rather than verified behavior."
+        ],
+        "B": [
+          "Asserts a specific handler flow (`executionGraph.getPlan()`) that may be wrong or unsupported.",
+          "Uses docs-generator and README files as the primary version-pinned docs anchor instead of the endpoint docs page.",
+          "Includes broad supporting classes that are not the closest neighboring tests for the handler itself."
+        ]
+      },
+      "critical_issues_by_run": {
+        "codex_grep_filesystem": [
+          "Asserts a specific handler flow (`executionGraph.getPlan()`) that may be wrong or unsupported.",
+          "Uses docs-generator and README files as the primary version-pinned docs anchor instead of the endpoint docs page.",
+          "Includes broad supporting classes that are not the closest neighboring tests for the handler itself."
+        ],
+        "codex_with_k2_mcp_tuned": [
+          "Does not pin the contract to the concrete message/header classes as explicitly as it could.",
+          "Neighboring tests are plausible but not the most direct proof for JobPlanHandler behavior.",
+          "Treats archival imports as suggestive rather than verified behavior."
+        ]
+      },
+      "label_to_run": {
+        "A": "codex_with_k2_mcp_tuned",
+        "B": "codex_grep_filesystem"
+      },
+      "question": "For Flink REST API 2.2.0, inspect `JobPlanHandler`: explain how plan metadata is returned through a REST handler. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?",
+      "rationale": "A is safer and more directly aligned to the question: it anchors the exact `JobPlanHandler`, the versioned REST docs page, and nearby handler tests without overcommitting to an internal call path. B is more detailed, but it likely overstates the implementation flow and leans on broader generator/README anchors instead of the closest REST-handler evidence.",
+      "scores_by_label": {
+        "A": {
+          "correctness": 4,
+          "grounding": 4,
+          "risk": 4,
+          "specificity": 3,
+          "usefulness": 4
+        },
+        "B": {
+          "correctness": 3,
+          "grounding": 5,
+          "risk": 3,
+          "specificity": 5,
+          "usefulness": 5
+        }
+      },
+      "scores_by_run": {
+        "codex_grep_filesystem": {
+          "correctness": 3,
+          "grounding": 5,
+          "risk": 3,
+          "specificity": 5,
+          "usefulness": 5
+        },
+        "codex_with_k2_mcp_tuned": {
+          "correctness": 4,
+          "grounding": 4,
+          "risk": 4,
+          "specificity": 3,
+          "usefulness": 4
+        }
+      },
+      "title": "Flink REST pattern for JobPlanHandler",
+      "winner_label": "A",
+      "winner_run": "codex_with_k2_mcp_tuned"
+    }
+  ],
+  "run_id": "20260502T235110Z-llm-judge",
+  "scorecard_path": "docs/evaluations/runs/20260501T134908Z-real-mcp/extension-runs/20260501T231541Z-extension-arms/extension-runs/20260502T234443Z-extension-arms/extension-scorecard.json",
+  "seed": "k2-llm-judge-v1",
+  "summary": {
+    "case_count": 2,
+    "dimension_averages": {
+      "codex_grep_filesystem": {
+        "correctness": 2.5,
+        "grounding": 4.0,
+        "risk": 2.5,
+        "specificity": 4.5,
+        "usefulness": 4.0
+      },
+      "codex_with_k2_mcp_tuned": {
+        "correctness": 4.0,
+        "grounding": 4.0,
+        "risk": 4.0,
+        "specificity": 3.5,
+        "usefulness": 4.0
+      }
+    },
+    "mean_confidence": 0.745,
+    "tie_rate": 0.0,
+    "win_rates_excluding_ties": {
+      "codex_grep_filesystem": 0.0,
+      "codex_with_k2_mcp_tuned": 1.0
+    },
+    "winner_counts": {
+      "codex_with_k2_mcp_tuned": 2
+    }
+  }
+}

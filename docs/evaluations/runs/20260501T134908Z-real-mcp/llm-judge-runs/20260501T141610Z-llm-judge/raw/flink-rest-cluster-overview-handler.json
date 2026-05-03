@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.83,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A is more version-specific and source-anchored: it names the 2.2.0 REST docs, the concrete `ClusterOverviewHandler`, and adjacent message headers/tests. B is too vague, omits the pinned docs URL, and speculates about `ClusterOverviewHandlerTest` without evidence. A still has some uncertainty about exact test coverage, but it is materially more reliable for an engineer changing Flink REST code.",
+  "critical_issues": {
+    "A": [
+      "Claims a direct response-shape contract from the docs without showing the handler body or exact field mapping.",
+      "Neighboring tests are plausible but not verified as the best anchors for this endpoint."
+    ],
+    "B": [
+      "Does not pin the Flink 2.2.0 docs URL or a concrete versioned contract for `/overview`.",
+      "Suggests `ClusterOverviewHandlerTest` without verifying that such a test exists.",
+      "Stays too generic about the response model and nearby implementation classes."
+    ]
+  }
+}

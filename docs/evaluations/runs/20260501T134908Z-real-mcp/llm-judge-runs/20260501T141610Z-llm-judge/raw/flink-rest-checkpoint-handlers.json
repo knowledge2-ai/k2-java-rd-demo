@@ -1,0 +1,31 @@
+{
+  "winner": "B",
+  "confidence": 0.83,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 3
+    }
+  },
+  "rationale": "B is better anchored to Flink 2.2.0 by naming the release-pinned docs, the exact `CheckpointHandlers` implementation, and a concrete neighboring test file. A is safer but too generic, with only a package path and vague neighboring-test guidance. B has some risk from extra claims like surfaced evidence and fragment URLs, but it is still more actionable and version-specific.",
+  "critical_issues": {
+    "A": [
+      "Uses a 2.2.x docs URL instead of a version-pinned 2.2.0 anchor.",
+      "Does not name concrete neighboring test classes, only a package path."
+    ],
+    "B": [
+      "Adds unsupported evidence-trace language that is not itself a source artifact.",
+      "The `#part-0001` URL fragments are suspicious and may not be stable anchors."
+    ]
+  }
+}

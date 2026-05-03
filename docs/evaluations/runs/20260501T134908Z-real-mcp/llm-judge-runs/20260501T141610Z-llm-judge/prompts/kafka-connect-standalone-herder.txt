@@ -1,0 +1,124 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-standalone-herder
+TITLE: Kafka Connect pattern for StandaloneHerder
+QUESTION:
+For Kafka Connect 4.2.0, inspect `StandaloneHerder`: inspect standalone connector config update behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the 4.2.0 Kafka Connect user guide plus the standalone runtime implementation. For this topic, the most relevant sources are the version-pinned docs at `https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001`, `https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001`, and `https://kafka.apache.org/42/kafka-connect/` for the Connect overview, with config reference context from `https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040`.
+
+**Implementation anchors**
+- `StandaloneHerder` is the implementation class to inspect: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerder.java`.
+- The returned snippet shows the standalone task-update path in `updateConnectorTasks(String connName)`: it skips updates when the connector is not running or not `TargetState.STARTED`, recomputes task configs, reverse-transforms them, checks `taskConfigsChanged(...)`, then removes tasks, persists new task configs, and recreates connector tasks.
+- `StandaloneConfig` is the adjacent runtime config anchor for standalone mode: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java`.
+
+**Tests to inspect or add**
+- Existing neighbor test to inspect first: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java`.
+- retrieval system also surfaced `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`, but that is only a loose neighboring Connect integration test, not a direct standalone config-update regression test.
+- If you need coverage for connector config updates in standalone mode, add or extend a focused regression in `StandaloneHerderTest` around:
+  - skipping updates when the connector is stopped,
+  - no-op behavior when configs are unchanged,
+  - task recreation when configs change.
+
+**Citations**
+- Docs: `https://kafka.apache.org/42/kafka-connect/user-guide/#part-0001`
+- Docs: `https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001`
+- Docs: `https://kafka.apache.org/42/kafka-connect/`
+- Docs: `https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040`
+- Code: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerder.java`
+- Code: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneConfig.java`
+- Test: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java`
+- Test: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`
+
+**Uncertainties**
+- retrieval did not return the specific `StandaloneHerderTest` methods or assertions, so I cannot name the exact existing regression cases without guessing.
+- The docs returned are version-pinned and relevant, but retrieval system did not surface a standalone-specific doc section that directly explains config-update semantics.
+
+ANSWER B:
+**Recommendation**
+Use the Kafka Connect 4.2.0 standalone-mode docs as the user-facing anchor, then validate behavior directly in `StandaloneHerder`. For config updates in standalone mode, the key question is whether an update replaces the existing connector config and triggers the expected stop/restart path, rather than distributed-mode rebalance semantics.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerder.java`
+- If you need the full path of effect, also inspect the standalone config/storage and worker restart path in the same runtime area.
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java`
+- Any other tests in `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/` that cover connector lifecycle or config replacement
+- If config-update behavior is not already covered, add a regression test in that package for repeated `putConnectorConfig` / update semantics
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerder.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java`
+
+**Uncertainties**
+- I cannot pin the exact 4.2.0 public docs URL from memory without browsing.
+- I am confident about `StandaloneHerder`; I am less certain about the exact names of any additional neighboring test classes beyond `StandaloneHerderTest`.

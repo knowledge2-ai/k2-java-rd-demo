@@ -1,0 +1,174 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-worker-source-task
+TITLE: Kafka Connect pattern for WorkerSourceTask
+QUESTION:
+For Kafka Connect 4.2.0, inspect `WorkerSourceTask`: inspect source task polling and commit behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka Connect 4.2 source API Javadocs plus the runtime classes that actually implement the poll/commit loop. For standard source tasks, the key behavior is split between `AbstractWorkerSourceTask` and `WorkerSourceTask`; for exactly-once semantics, `ExactlyOnceWorkerSourceTask` is the parallel anchor.
+
+**Implementation anchors**
+- `connect/api/src/main/java/org/apache/kafka/connect/source/SourceTask.java` for the versioned contract:
+  - `poll()` blocks but must return control regularly.
+  - `commit()` is invoked periodically on offset commits and does not necessarily align with the latest `poll()` offsets.
+  - `commitRecord()` is the fine-grained callback on successful delivery or filtered/dropped records.
+- `connect/api/src/main/java/org/apache/kafka/connect/source/TransactionContext.java` for exactly-once transaction boundary semantics tied to `poll()`.
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTask.java` for the shared poll-convert-send loop:
+  - `execute()` drives `poll()` and `sendRecords()`.
+  - `poll()` wraps retriable errors by returning `null`.
+  - `sendRecords()` handles record dispatch, acks, drops, and commit callbacks.
+  - `commitTaskRecord()` and `commitSourceTask()` wrap `SourceTask.commitRecord()` and `SourceTask.commit()`.
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java` for standard source-task offset commit behavior:
+  - `beginSendIteration()` refreshes committable offsets.
+  - `recordSent()` and `recordDropped()` feed commit tracking.
+  - `commitOffsets()` drains committable offsets, flushes them through `OffsetStorageWriter`, and still calls `SourceTask.commit()` even when nothing is pending.
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTask.java` for the EOS variant:
+  - commits through producer transactions instead of the non-EOS flush path.
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java`
+  - `testPollReturnsNoRecords`
+  - `testCommit`
+  - `testCommitFailure`
+  - `testSendRecordsTaskCommitRecordFail`
+  - `testSourceTaskIgnoresProducerException`
+  - `testFailureInPollAfterStop`
+  - `assertShouldSkipCommit()` near the bottom, which checks the `shouldCommitOffsets()` gate and `SourceTaskOffsetCommitter.commit(...)` skip path.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java`
+  - `testPollReturnsNoRecords`
+  - `testPollBasedCommit`
+  - `testIntervalBasedCommit`
+  - `testPause`
+  - `testFailureInPollAfterStop`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java`
+  - `testMetricsGroup` for poll/write metric behavior around the shared loop.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitterTest.java`
+  - `testSchedule`
+  - `testRemoveSuccess`
+  - `testRemoveCancelledTask`
+  - `testRemoveTaskAndInterrupted`
+  - useful if you want to pin the scheduling/skip logic behind periodic source offset commits.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceTask.java#L94-L154`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/TransactionContext.java#L19-L65`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTask.java#L345-L395`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTask.java#L407-L595`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java#L110-L208`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java#L218-L325`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTask.java#L185-L340`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L463-L705`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L1012-L1025`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ExactlyOnceWorkerSourceTaskTest.java#L555-L620`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractWorkerSourceTaskTest.java#L204-L248`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitterTest.java#L75-L163`
+
+**Uncertainties**
+- This checkout does not include a rendered `docs/` tree, so I anchored on the versioned source Javadocs in `connect/api` instead of a published HTML doc page.
+- `WorkerSourceTask` is package-private; the actual poll loop is in `AbstractWorkerSourceTask`, so any answer that only cites `WorkerSourceTask` will be incomplete.
+- EOS behavior is intentionally different from standard `WorkerSourceTask`, so if the question is strictly about non-EOS source tasks, you can omit `ExactlyOnceWorkerSourceTask` and `TransactionContext`.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Kafka 4.2.0 Connect docs plus the runtime commit scheduler, not just `WorkerSourceTask` itself. The clearest behavior split is:
+- source tasks poll records in the task execution loop, and
+- offset commits are driven by `SourceTaskOffsetCommitter`, which only calls `WorkerSourceTask.commitOffsets()` when `shouldCommitOffsets()` is true and logs/handles failures around the flush path [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0010](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0010), [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitter.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitter.java).
+
+**Implementation anchors**
+- `WorkerSourceTask` is the implementation class to inspect for the source-task execution path, including the commit-flush path and timeout/cancel handling [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java).
+- `SourceTaskOffsetCommitter` is the neighboring runtime class that schedules and gates commits; its `commit(WorkerSourceTask)` helper skips when there are no offsets to commit, otherwise invokes `workerTask.commitOffsets()` and catches unexpected exceptions so the scheduled executor keeps running [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitter.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitter.java).
+- Version-pinned docs to cite:
+  - Kafka Connect landing page for 4.2 [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Connector Development Guide section describing `SourceTask` commit/commitRecord semantics [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0010](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0010)
+  - Kafka API page for the Connect API [https://kafka.apache.org/42/apis/#part-0003](https://kafka.apache.org/42/apis/#part-0003)
+
+**Tests to inspect or add**
+- `WorkerSourceTaskTest` for the direct unit-level behavior around commit skipping and log assertions [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java).
+- `SourceTaskOffsetCommitterTest` for scheduled commit gating, timeout, and failure handling [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitterTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitterTest.java).
+- `ErrorHandlingTaskTest` for an execution-path regression test showing `sourceTask.poll()` is invoked and `commitOffsets()` is reached after task execution [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ErrorHandlingTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ErrorHandlingTaskTest.java).
+- `ExactlyOnceSourceIntegrationTest` if you want to contextualize offset behavior under exactly-once / per-connector offsets semantics, but it is not the first test to cite for basic poll/commit flow [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java).
+
+**Citations**
+- Docs:
+  - [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0010](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0010)
+  - [https://kafka.apache.org/42/apis/#part-0003](https://kafka.apache.org/42/apis/#part-0003)
+- Code:
+  - [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java)
+  - [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitter.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitter.java)
+- Tests:
+  - [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java)
+  - [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitterTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/SourceTaskOffsetCommitterTest.java)
+  - [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ErrorHandlingTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ErrorHandlingTaskTest.java)
+  - [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java)
+
+**Uncertainties**
+- The retrieved evidence included the `WorkerSourceTask` file and commit-related snippets, but not a full method-level dump of the `poll` implementation body. So I can anchor the commit behavior precisely, but any line-by-line claim about the exact `poll()` loop should be treated as incomplete unless you fetch the file directly.

@@ -1,0 +1,143 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-connector-client-config-override-policy
+TITLE: Kafka Connect pattern for ConnectorClientConfigOverridePolicy
+QUESTION:
+For Kafka Connect 4.2.0, inspect `ConnectorClientConfigOverridePolicy`: inspect connector client override validation behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the 4.2.0 Connect docs plus the abstract runtime policy implementation. The behavior to describe is: Connect validates connector client override entries by converting each client property into a `ConfigValue` and delegating per-entry validation through the policy implementation, so the effective allow/deny logic lives in concrete policies that extend the abstract base. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+
+**Implementation anchors**
+- `ConnectorClientConfigOverridePolicy` interface in `connect/api/.../ConnectorClientConfigOverridePolicy.java` for the contract and ServiceLoader-based discovery. [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java]
+- `AbstractConnectorClientConfigOverridePolicy` in `connect/runtime/.../AbstractConnectorClientConfigOverridePolicy.java` for the actual validation flow:
+  - `validate(ConnectorClientConfigRequest)` reads `clientProps()`
+  - maps each entry to `ConfigValue`
+  - calls `validate(configValue)` on each one
+  - returns the per-property list of validation results. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+- 4.2.0 user-guide docs that explain connector override configuration and the security recommendation to set `connector.client.config.override.policy`:
+  - user guide security section. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0041]
+  - user guide section on `producer.override.` and `consumer.override.` prefixes. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0004]
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java` for the shared validation harness. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java]
+- `connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java` for the deny-all style policy behavior. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java]
+- `connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java` for the allow-only-principal behavior. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java]
+- `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` for end-to-end connector config validation paths involving overridden client configs. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0041]
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0004]
+- Interface: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java]
+- Abstract implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java]
+- Shared tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+
+**Uncertainties**
+- retrieval returned a strong anchor set, but it did not surface a dedicated `ConnectorClientConfigOverridePolicyTest` class in 4.2.0; the neighboring coverage appears to be the shared base plus policy-specific subclasses. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java]
+- The docs hit for `kafka-connect-configs` was about related config validators, not the policy itself, so the user guide security/override sections are the better version-pinned anchors. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0041]
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the 4.2.0 source Javadocs and the abstract validator, not on an external docs page. The behavior is: each overridden client property is validated individually; disallowed entries get a `ConfigValue` error message, and the worker/herder reject connector creation if any errors remain. The config doc in `WorkerConfig` says the default policy is `All`, with `Allowlist`, `None`, and deprecated `Principal` as the other supported modes.
+
+**Implementation anchors**
+- API contract and validation intent: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java#L25`
+- Core validation logic that maps each client override to a `ConfigValue` and adds the policy error message: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java#L29`
+- Runtime enforcement in config validation: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java#L925`
+- Runtime enforcement when assembling client configs: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L991`
+- Version-pinned config doc for the policy setting: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L159`
+- Concrete policy semantics:
+  - Allowlist allow/deny behavior: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicy.java#L30`
+  - Deny-all behavior: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicy.java#L28`
+  - Deprecated principal-only behavior: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicy.java#L33`
+
+**Tests to inspect or add**
+- Shared unit-test harness for policy validation: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/BaseConnectorClientConfigOverridePolicyTest.java#L29`
+- Allowlist policy unit tests, including default deny and configured allowlist: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicyTest.java#L32`
+- None policy unit tests: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/NoneConnectorClientConfigOverridePolicyTest.java#L28`
+- Principal policy unit tests: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/connector/policy/PrincipalConnectorClientConfigOverridePolicyTest.java#L28`
+- Herder validation tests for mixed allowed/disallowed overrides: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java#L793`
+- Worker config assembly and rejection tests for producer/consumer/admin overrides: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java#L1087`
+- End-to-end connector creation tests through the REST layer: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorClientPolicyIntegrationTest.java#L60`
+- If you need direct unit coverage for `All`, there is no dedicated `AllConnectorClientConfigOverridePolicyTest` in this checkout; add one by mirroring the base-test pattern.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L159`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/policy/ConnectorClientConfigOverridePolicy.java#L25`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AbstractConnectorClientConfigOverridePolicy.java#L29`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java#L925`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java#L991`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/connector/policy/AllowlistConnectorClientConfigOverridePolicy.java#L30`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java#L793`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorClientPolicyIntegrationTest.java#L60`
+
+**Uncertainties**
+- I did not find a separate rendered docs artifact in this checkout, so I anchored on the version-pinned source Javadocs and config docs in the 4.2 tree.
+- There is no dedicated `AllConnectorClientConfigOverridePolicyTest` unit test here; `All` is covered indirectly by herder/worker/integration tests.

@@ -1,0 +1,133 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugins
+TITLE: Kafka Connect pattern for Plugins
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Plugins`: trace plugin discovery and connector class loading. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the explanation on the 4.2.0 Connect user guide plus the connector development guide, then tie it to `Plugins` in the runtime and the local regression tests around plugin loading. The docs establish the intended discovery contract; the code shows the runtime enforcement path. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040) [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004) [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java)
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect 4.2 user guide section on plugin manifests and compatibility: plugins must appear in a manifest for their plugin superclass, and the guide lists the expected manifest-backed plugin types. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040)
+  - Kafka Connect 4.2 connector development guide: plugin discoverability is via a `ServiceLoader` manifest under `META-INF/services/...` for the connector interface. [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004)
+- Implementation class:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java` is the runtime anchor for plugin discovery and class loading. The retrieved evidence specifically shows `pluginClassFromConfig(...)` calling `config.getClass(propertyName)`, verifying the loaded class is assignable to the requested plugin type, and throwing a `ConnectException` with the available classes when it is not. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java)
+  - The surrounding config path also matters: `AbstractHerder.validateConnectorConfig(...)` reads `connector.class`, resolves the connector type, and uses the worker/plugin class-loading path before validation continues. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java)
+  - For the public config contract, `ConnectorConfig` documents `connector.class` as a subclass of `org.apache.kafka.connect.connector.Connector` and defines the plugin version config alongside it. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java)
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java` first. retrieval system shows it contains test plugin fixtures for connector, converter, and ServiceLoader-based plugins, so it is the nearest behavioral coverage for discovery and class resolution. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java)
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java` for class-loading coordination and deadlock-sensitive behavior around `DelegatingClassLoader` / plugin loading. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java)
+- If you add coverage, target:
+  - manifest-backed discovery for connectors and converters,
+  - `connector.class` resolution from config,
+  - negative cases where a configured class is not assignable to the expected plugin interface,
+  - class-loading synchronization or loader delegation regressions. These are the behaviors directly implied by the retrieval system code and docs above. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java) [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java)
+
+**Citations**
+- [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040)
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004)
+- [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java)
+- [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java)
+- [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java)
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/TestPlugins.java)
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java)
+
+**Uncertainties**
+- The retrieval system snippet for `Plugins.java` is partial, so I can confirm the config-based class resolution and error path, but not the full `pluginClass(...)` implementation details without another source pull.
+- `TestPlugins.java` is clearly the nearest anchor, but retrieval system did not enumerate every specific test method relevant to `Plugins`; if you need method-level anchoring, that needs a follow-up source lookup.
+
+ANSWER B:
+**Recommendation**
+- Anchor the explanation on the Kafka Connect 4.2.0 docs section for `plugin.path`, plugin isolation, and classloader separation.
+- Then trace `org.apache.kafka.connect.runtime.isolation.Plugins` as the orchestration point for discovery and connector instantiation, and follow the handoff into the delegating/plugin classloaders.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java`
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java`
+- Inspect `PluginClassLoader` in the same package if you need the actual plugin-bound load boundary.
+- The flow to document is: scan plugin locations -> build plugin index/map -> resolve connector class name -> load through the plugin-specific classloader -> instantiate the connector.
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java`
+- If you add a regression, make it about classpath-vs-`plugin.path` shadowing, ambiguous plugin resolution, and connector loading from the plugin classloader rather than the worker classpath.
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java`
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java`
+
+**Uncertainties**
+- I cannot verify the exact 4.2.0 docs URL here, so I’m anchoring on the versioned Kafka Connect docs topic rather than a hard link.
+- I’m confident about `Plugins` and `DelegatingClassLoader`; I would want repo access to confirm the exact neighboring scanner test filenames if you need a complete file list.

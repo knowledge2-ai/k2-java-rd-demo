@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.87,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 4,
+      "specificity": 3,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A better matches the requested anchor set: version-pinned docs, the actual `SourceRecord` implementation, and nearby unit tests (`SourceRecordTest`, `ConnectRecordTest`). B has more concrete URLs and paths, but its “neighboring tests” are off-target runtime/integration helpers and its `newRecord` preservation claim is less well-grounded for the asked source/partition inspection.",
+  "critical_issues": {
+    "A": [
+      "Does not provide exact version-pinned doc URLs, only artifact names.",
+      "Neighboring test names are plausible but not verified against source in the answer."
+    ],
+    "B": [
+      "Cites runtime integration/helper tests instead of neighboring `SourceRecord`/`ConnectRecord` unit tests.",
+      "Overstates `newRecord(...)` behavior without enough direct test anchoring for the requested inspection.",
+      "The cited `SamplePredicate` is a helper, not an anchor test for `SourceRecord` construction or partition metadata."
+    ]
+  }
+}

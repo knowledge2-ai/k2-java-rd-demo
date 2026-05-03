@@ -1,0 +1,122 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-rest-connector-state-info
+TITLE: Kafka Connect pattern for ConnectorStateInfo
+QUESTION:
+For Kafka Connect REST 4.2.0, inspect `ConnectorStateInfo`: inspect connector state response representation. Which version-pinned docs and implementation class should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka 4.2.0 Connect REST administration docs, with the implementation anchored in `ConnectorStateInfo` from the Connect runtime REST entities package. The primary version-pinned doc is the Administration page, which covers connector status and task status responses [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]. The implementation class is `org.apache.kafka.connect.runtime.rest.entities.ConnectorStateInfo` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorStateInfo.java].
+
+**Implementation anchors**
+- Version-pinned docs: Kafka 4.2 Connect Administration page [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Contextual version-pinned docs: Kafka 4.2 Connect Overview page [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Core implementation class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorStateInfo.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorStateInfo.java]
+
+**Tests to inspect or add**
+- Inspect `InternalConnectResourceTest` for REST response coverage around connector status/state payloads [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java]
+- Add or extend a focused test around `ConnectorStateInfo` serialization and the connector state response shape if the current suite does not assert the exact JSON contract.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Docs: [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorStateInfo.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java]
+
+**Uncertainties**
+- The retrieved evidence did not surface a dedicated `ConnectorStateInfoTest`; that may mean there is no direct unit test for this entity in 4.2.0, or it was not retrieved by the search.
+- The docs evidence is about the Connect REST administration surface generally; it does not explicitly name `ConnectorStateInfo`, so the class-level contract still needs to be confirmed against the code path that emits the connector state response.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Kafka Connect REST API for the exact release line `4.2.0`, and treat `GET /connectors/{connector}/status` as the source of truth for the connector state response shape. The response representation is the `ConnectorStateInfo` entity, so any behavioral description should be tied to that class and the REST resource that returns it.
+
+**Implementation anchors**
+- Version-pinned docs: Kafka `4.2.0` Connect REST API reference for the status endpoint.
+- Version-pinned entity: `org.apache.kafka.connect.runtime.rest.entities.ConnectorStateInfo`
+- Response producer: `org.apache.kafka.connect.runtime.rest.resources.ConnectorsResource` status handler
+- Upstream status source: the herder-side status API that populates the entity, typically `Herder` / `KafkaHerder` status lookup
+
+**Tests to inspect or add**
+- REST resource tests for `ConnectorsResource` status responses
+- Serialization/deserialization tests for `ConnectorStateInfo`
+- Tests that verify:
+  - connector `state`, `worker_id`, and `trace` fields
+  - task entries include `id`, `state`, `worker_id`, and `trace`
+  - schema/field ordering or JSON shape if the client depends on it
+- If missing, add a regression test for the exact JSON payload returned by `GET /connectors/{name}/status`
+
+**Citations**
+- `org.apache.kafka.connect.runtime.rest.entities.ConnectorStateInfo`
+- `org.apache.kafka.connect.runtime.rest.resources.ConnectorsResource`
+- Kafka Connect REST API docs for release `4.2.0` status endpoint
+
+**Uncertainties**
+- I am confident about the entity class and REST resource anchor, but I am not fully certain of the exact public doc URL path for Kafka `4.2.0` without checking the docs.
+- I am also not certain whether the current implementation routes through `KafkaHerder` or another herder implementation in that exact branch, so I would phrase that part generically unless I could inspect the source.

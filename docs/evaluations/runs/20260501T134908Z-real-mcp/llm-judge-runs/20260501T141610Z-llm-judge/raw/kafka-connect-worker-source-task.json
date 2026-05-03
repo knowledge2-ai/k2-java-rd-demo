@@ -1,0 +1,33 @@
+{
+  "winner": "B",
+  "confidence": 0.82,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 3
+    }
+  },
+  "rationale": "B is better anchored to Kafka 4.2 Connect docs, names the runtime scheduler class that actually gates source offset commits, and points to concrete neighboring tests. A is mostly generic, cites only the docs root, and misses the commit scheduler path that matters for WorkerSourceTask behavior. B still overstates some exact test/class existence and method details, but it is materially more useful and grounded.",
+  "critical_issues": {
+    "A": [
+      "Docs anchor is too generic: it cites the Kafka docs root, not the versioned Connect guide section for SourceTask poll/commit semantics.",
+      "Misses the key neighboring runtime class `SourceTaskOffsetCommitter`, which is central to commit scheduling.",
+      "Test guidance is vague and partly speculative (`SourceTaskOffsetCommitterTest-style coverage`), so it is less actionable for a code change."
+    ],
+    "B": [
+      "Some claims are more specific than the evidence shown, especially exact method behavior like `shouldCommitOffsets()` and `commitOffsets()`.",
+      "A few named tests may be overconfident without direct verification in the 4.2.0 tree, so the answer should flag that uncertainty more explicitly.",
+      "The `apis/#part-0003` citation is less directly relevant than the Connect development guide for this question."
+    ]
+  }
+}

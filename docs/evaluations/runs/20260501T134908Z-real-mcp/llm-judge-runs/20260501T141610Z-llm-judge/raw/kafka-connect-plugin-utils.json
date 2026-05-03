@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.84,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A gives concrete version-pinned docs, the exact implementation class, and the neighboring unit test, which is what an engineer needs. It is still slightly risky because the exact doc fragment IDs and the alias-helper characterization may not be fully verified. B is too vague, lacks pinned anchors, and adds speculative neighboring tests and helper behavior without support.",
+  "critical_issues": {
+    "A": [
+      "Exact Kafka doc fragment IDs may be off; they are specific but not fully verified here.",
+      "The claim about connector-class alias semantics is plausible but not anchored to a named helper method."
+    ],
+    "B": [
+      "Does not give version-pinned doc anchors, only a generic docs root.",
+      "Speculates about helper behavior and adjacent tests without concrete source anchors.",
+      "Too vague to guide an engineer to the exact file or behavior to inspect."
+    ]
+  }
+}

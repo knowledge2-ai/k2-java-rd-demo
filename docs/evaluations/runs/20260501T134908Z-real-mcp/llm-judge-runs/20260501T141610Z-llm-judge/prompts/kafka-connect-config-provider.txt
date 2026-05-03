@@ -1,0 +1,130 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-config-provider
+TITLE: Kafka Connect pattern for ConfigProvider
+QUESTION:
+For Kafka Connect 4.2.0, inspect `ConfigProvider`: inspect the config provider contract used for externalized secrets. Which version-pinned docs and implementation class should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "clients"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka Connect 4.2.0 docs plus the `ConfigProvider` interface contract in `clients`. For the contract itself, the primary implementation anchor is `org.apache.kafka.common.config.provider.ConfigProvider` and the built-in reference implementation is `FileConfigProvider` for cleartext properties files.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect 4.2 index: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Kafka configuration index, which includes the Configuration Providers section: [https://kafka.apache.org/42/configuration/](https://kafka.apache.org/42/configuration/)
+  - Kafka Connect configs page: [https://kafka.apache.org/42/configuration/kafka-connect-configs/](https://kafka.apache.org/42/configuration/kafka-connect-configs/)
+- Code anchor:
+  - `ConfigProvider` interface: [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/ConfigProvider.java](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/ConfigProvider.java)
+  - Built-in concrete provider: `FileConfigProvider`: [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/FileConfigProvider.java](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/FileConfigProvider.java)
+
+**Tests to inspect or add**
+- Inspect any Connect tests that exercise externalized config/provider loading and secret resolution.
+- Add coverage for:
+  - `ServiceLoader` discovery of `ConfigProvider`
+  - `get(path)` and `get(path, keys)` behavior
+  - optional `subscribe`, `unsubscribe`, and `unsubscribeAll` defaults
+  - failure behavior when a provider does not support subscription callbacks
+- retrieval did not return a specific `ConfigProvider` test class for 4.2.0, so I would verify the relevant Connect runtime tests directly before assuming existing coverage.
+
+**Citations**
+- `ConfigProvider` contract and ServiceLoader discovery: [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/ConfigProvider.java](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/ConfigProvider.java)
+- Built-in provider example: [repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/FileConfigProvider.java](repo://apache/kafka@4.2/clients/src/main/java/org/apache/kafka/common/config/provider/FileConfigProvider.java)
+- Version-pinned Kafka Connect docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+- Version-pinned configuration docs: [https://kafka.apache.org/42/configuration/](https://kafka.apache.org/42/configuration/)
+- Kafka Connect configs page: [https://kafka.apache.org/42/configuration/kafka-connect-configs/](https://kafka.apache.org/42/configuration/kafka-connect-configs/)
+
+**Uncertainties**
+- retrieved evidence did not surface a dedicated 4.2 configuration-providers page, so I am not claiming one exists without further verification.
+- The evidence clearly anchors the contract on `ConfigProvider`, but it does not identify a single secret-backend implementation beyond the built-in `FileConfigProvider`.
+
+ANSWER B:
+**Recommendation**
+- Anchor the explanation on Kafka Connect 4.2.0’s version-pinned Connect docs for **Config Providers**.
+- For code, anchor on the SPI `org.apache.kafka.common.config.provider.ConfigProvider` and the built-in concrete provider `org.apache.kafka.common.config.provider.FileConfigProvider`.
+- If you need one implementation class to cite for externalized secrets behavior, `FileConfigProvider` is the safest anchor.
+
+**Implementation anchors**
+- `org.apache.kafka.common.config.provider.ConfigProvider` is the contract: `configure(...)`, `get(...)`, `close()`.
+- `org.apache.kafka.common.config.provider.FileConfigProvider` is the reference implementation used by Connect-style externalized config substitution.
+- `org.apache.kafka.common.config.ConfigTransformer` is the resolution path worth mentioning if you explain how `${provider:path:key}` gets expanded.
+
+**Tests to inspect or add**
+- `ConfigTransformer` tests for placeholder resolution and error paths.
+- `FileConfigProvider` tests for file lookup, missing keys, and lifecycle/close behavior.
+- Connector/worker config tests covering substitution in real Connect configs, including nested or repeated placeholders.
+- If the contract is documented as supporting TTL or refresh semantics in 4.2.0, add coverage for that explicitly; I am not fully certain that behavior is relevant in this release.
+
+**Citations**
+- Apache Kafka 4.2.0 Connect documentation, section **Config Providers**.
+- Source path: `clients/src/main/java/org/apache/kafka/common/config/provider/ConfigProvider.java`
+- Source path: `clients/src/main/java/org/apache/kafka/common/config/provider/FileConfigProvider.java`
+
+**Uncertainties**
+- I am confident about the SPI and `FileConfigProvider`, but I am not fully certain of the exact version-pinned doc URL fragment for the 4.2.0 docs.
+- If you need a single “official answer” sentence, I would phrase it as: “Kafka Connect externalized secrets are defined by the `ConfigProvider` SPI and demonstrated by `FileConfigProvider` in the 4.2.0 Connect Config Providers docs.”

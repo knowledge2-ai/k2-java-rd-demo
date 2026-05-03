@@ -1,0 +1,149 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-rest-connector-type
+TITLE: Kafka Connect pattern for ConnectorType
+QUESTION:
+For Kafka Connect REST 4.2.0, inspect `ConnectorType`: inspect connector type classification. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka 4.2 version-pinned Connect REST docs, the REST entity implementation of `ConnectorType`, and the dedicated `ConnectorTypeTest`. The retrieved evidence is enough to identify the correct files, but it did not surface the method-level classification logic, so don’t infer exact branching behavior beyond what the source itself shows.
+
+**Implementation anchors**
+- Version-pinned docs for the REST layer: Kafka Connect Administration [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Version-pinned docs for product context: Kafka Connect Overview [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Primary REST implementation: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorType.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorType.java]
+- Adjacent API-side type worth checking for shared semantics: `connect/api/src/main/java/org/apache/kafka/connect/health/ConnectorType.java` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/health/ConnectorType.java]
+
+**Tests to inspect or add**
+- Primary regression test: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorTypeTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorTypeTest.java]
+- Nearby REST tests that can provide surrounding patterns and serialization/resource conventions:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java]
+- If coverage is missing, add/extend `ConnectorTypeTest` with explicit assertions for any enum-to-wire mapping or classification edge cases.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/administration/#part-0001], [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorType.java], [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/health/ConnectorType.java]
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorTypeTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java]
+
+**Uncertainties**
+- retrieval system did not expose the full body of `ConnectorType.java`, so the exact classification rules and enum values are not confirmed here.
+- The docs surfaced are broad Connect REST docs, not a `ConnectorType`-specific API page.
+- I can name the correct anchor files, but not the precise behavior without a deeper source read.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the REST-facing enum `org.apache.kafka.connect.runtime.rest.entities.ConnectorType`, not the separate health enum in `connect/api`.
+- Classification in Kafka Connect REST 4.2.0 is:
+  - `SinkConnector` class -> `SINK`
+  - `SourceConnector` class -> `SOURCE`
+  - anything else or lookup failure -> `UNKNOWN`
+- The version-aware lookup happens in `AbstractHerder.connectorType(Map<String, String>)`, which resolves `CONNECTOR_VERSION` into a `VersionRange` before mapping the loaded class to the REST enum.
+- I did not find a separate versioned `docs/` or `src/site/` artifact in this checkout, so the source-level Javadocs/OpenAPI annotations are the practical docs anchor here.
+
+**Implementation anchors**
+- REST classification enum: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorType.java#L28-L50`
+- Version-aware lookup and fallback-to-unknown logic: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java#L1035-L1055`
+- REST payload shape that carries the type field:
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java#L26-L31`
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorStateInfo.java#L26-L31`
+- REST resource surface that returns those entities:
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java#L80-L180`
+- Separate health enum to avoid confusion:
+  - `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/health/ConnectorType.java#L21-L40`
+
+**Tests to inspect or add**
+- Existing enum serialization/round-trip coverage: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorTypeTest.java#L25-L44`
+- Existing herder classification tests:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java#L233-L335`
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java#L1188-L1205`
+- Existing REST flow tests that propagate `ConnectorInfo` / `ConnectorStateInfo`:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java#L457-L701`
+- Neighboring JSON serialization coverage for the REST enum: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L371-L400`
+- If you want to harden the classification rule itself, add a direct unit test for `ConnectorType.from(Class)` precedence and `UNKNOWN` fallback; today that behavior is only implicit in the enum implementation and indirectly exercised by `AbstractHerderTest`.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorType.java#L28-L50`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java#L1035-L1055`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java#L26-L31`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorStateInfo.java#L26-L31`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java#L80-L180`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorTypeTest.java#L25-L44`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java#L233-L335`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/AbstractHerderTest.java#L1188-L1205`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java#L457-L701`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L371-L400`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/health/ConnectorType.java#L21-L40`
+
+**Uncertainties**
+- I did not find standalone versioned REST docs files in this checkout, so the answer is anchored to source Javadocs/OpenAPI annotations instead.
+- There is no direct unit test here for `ConnectorType.from(Class)` itself; the sink-first/source-second ordering is only validated indirectly through `AbstractHerderTest`.

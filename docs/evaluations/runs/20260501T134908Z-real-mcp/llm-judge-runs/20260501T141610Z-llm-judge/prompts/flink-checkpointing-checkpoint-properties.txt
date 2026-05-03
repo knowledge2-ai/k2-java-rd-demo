@@ -1,0 +1,138 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-checkpoint-properties
+TITLE: Flink checkpointing pattern for CheckpointProperties
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CheckpointProperties`: explain checkpoint property flags and savepoint behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Explain `CheckpointProperties` as the runtime carrier for checkpoint lifecycle policy, not as storage format metadata.
+- For Flink 2.2.0, the key distinction is:
+  - regular checkpoints derive `discard*` behavior from the configured retention policy;
+  - savepoints are retained snapshots and should not be auto-discarded by subsumption, cancellation, failure, suspension, or normal completion.
+- If you mention savepoint variants, keep the wording conservative: the exact branch for forced or unclaimed savepoints should be verified against the factory methods in the 2.2.0 code.
+
+**Implementation anchors**
+- Version-pinned docs: Flink 2.2 checkpointing docs and savepoints docs.
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java`
+- Neighboring model classes to read with it: `CheckpointRetentionPolicy`, `CheckpointType`, and any savepoint-type factory in the same package.
+- Flag-level summary to anchor the prose:
+  - `discardSubsumed`
+  - `discardFinished`
+  - `discardCancelled`
+  - `discardFailed`
+  - `discardSuspended`
+  - savepoint indicator / forced-savepoint handling
+- The practical rule to state: savepoints override the normal cleanup lifecycle; checkpoints follow the retention policy.
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointPropertiesTest.java`
+- Adjacent tests in `org.apache.flink.runtime.checkpoint` that exercise checkpoint/savepoint factories.
+- Add or verify coverage for:
+  - default checkpoint retention mapping
+  - externalized checkpoint cleanup behavior
+  - savepoint retention behavior
+  - forced savepoint behavior
+  - unclaimed savepoint behavior if that path exists in 2.2.0
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointPropertiesTest.java`
+
+**Uncertainties**
+- I am not fully certain whether 2.2.0 exposes an explicit unclaimed-savepoint branch directly in `CheckpointProperties` or via adjacent savepoint classes, so verify the factory methods before writing exact docs text.
+- I am not giving a hard docs URL because the version-pinned public path can vary by Flink docs site generation; use the 2.2 checkpointing and savepoints pages when you anchor the narrative.
+
+ANSWER B:
+## Recommendation
+Use `CheckpointProperties` in `flink-runtime` as the implementation anchor, and keep the explanation tied to the 2.2.0 docs for checkpoints/savepoints. The class models checkpoint retention and cleanup semantics, while savepoints are handled as a distinct manual path, not as queued time-triggered checkpoints [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java].
+
+## Implementation anchors
+- `CheckpointProperties` is the source of truth for the property flags and retention behavior, including the delete/retain matrix for success, cancellation, failure, and suspension [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java].
+- The docs anchor is the 2.2 release checkpointing docs, especially the checkpoints overview and the checkpointing guide, which point readers to the checkpoints-vs-savepoints distinction [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001] [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001].
+- Savepoint behavior should be described as manual-triggered and separate from checkpoint queuing/trigger limits; the retrieved class text explicitly notes savepoints are not queued due to time-trigger limits and require separate garbage-collection handling [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java].
+
+## Tests to inspect or add
+- `CheckpointPropertiesTest` for direct flag/behavior coverage [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointPropertiesTest.java].
+- `PendingCheckpointTest` for forced-checkpoint subsumption and lifecycle edge cases [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PendingCheckpointTest.java].
+- `CompletedCheckpointTest` for garbage-collection and cleanup behavior on subsume [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointTest.java].
+- `CheckpointMetadataLoadingTest` for savepoint loading behavior and savepoint-format interactions [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetadataLoadingTest.java].
+- `CheckpointFailureManagerTest` if you need coverage for how retention policy affects failure handling [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointFailureManagerTest.java].
+
+## Citations
+- Docs: checkpoints overview [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+- Docs: checkpointing guide [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- Implementation: `CheckpointProperties` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java]
+- Test: `CheckpointPropertiesTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointPropertiesTest.java]
+- Neighbor tests: `PendingCheckpointTest`, `CompletedCheckpointTest`, `CheckpointMetadataLoadingTest`, `CheckpointFailureManagerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PendingCheckpointTest.java] [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointTest.java] [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetadataLoadingTest.java] [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointFailureManagerTest.java]
+
+## Uncertainties
+- The retrieved evidence clearly identifies the correct class and neighboring tests, but the returned source snippet is truncated, so I cannot safely enumerate every constructor argument or every flag name beyond the visible retention/delete semantics.
+- If you need a byte-accurate flag-by-flag description, the next step is to inspect the full `CheckpointProperties.java` source and `CheckpointPropertiesTest.java` together.

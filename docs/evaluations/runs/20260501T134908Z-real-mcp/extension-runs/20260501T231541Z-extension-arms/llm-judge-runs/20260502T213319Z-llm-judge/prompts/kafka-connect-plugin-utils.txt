@@ -1,0 +1,132 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugin-utils
+TITLE: Kafka Connect pattern for PluginUtils
+QUESTION:
+For Kafka Connect 4.2.0, inspect `PluginUtils`: inspect plugin path and alias helper behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the version-pinned Kafka 4.2 docs plus the `PluginUtils` runtime class and its dedicated unit test. The docs establish the intended `plugin.path` and connector-class alias semantics; the code/test pair should be treated as the source of truth for exact helper behavior.
+
+**Implementation anchors**
+- Kafka Connect user guide, `plugin.path` and plugin migration behavior: [`https://kafka.apache.org/42/kafka-connect/user-guide/#part-0038`](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0038)
+- Kafka Connect connector development guide, plugin visibility/manifest rules: [`https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001`](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001)
+- Kafka Connect config docs for connector-class aliasing: [`https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040`](https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040)
+- Implementation class: [`repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java)
+
+**Tests to inspect or add**
+- Existing neighboring unit test: [`repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java)
+- If coverage is thin, add focused cases there for:
+  - plugin path parsing/normalization
+  - alias helper behavior for connector class names and short aliases
+  - rejection/edge cases for malformed input or non-plugin entries
+
+**Citations**
+- [`https://kafka.apache.org/42/kafka-connect/user-guide/#part-0038`](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0038)
+- [`https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001`](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001)
+- [`https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040`](https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040)
+- [`repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java)
+- [`repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java)
+
+**Uncertainties**
+- The retrieved evidence identifies the correct `PluginUtils` file and nearby test file, but it did not expose the full method bodies for the plugin-path and alias helpers. I would not claim exact branch-level behavior beyond the anchored docs and class paths without reading the file directly.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the 4.2 source docs in [`WorkerConfig.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L129-L154) for the `plugin.path` contract, and on [`PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L203-L443) for the actual scan/alias logic.
+- For the two behaviors you asked about:
+  - `plugin.path` is a comma-separated list of top-level plugin roots; the implementation walks directories, follows symlinks, accepts jars/zips or class hierarchies, and preserves class-only roots when there are no archives.
+  - alias helpers use both `simpleName()` and `prunedName()`; `computeAliases()` keeps only unambiguous aliases and drops collisions.
+
+**Implementation anchors**
+- [`WorkerConfig.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L129-L154): version-pinned source docs for `plugin.path` and `plugin.discovery`.
+- [`PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L203-L341): `pluginLocations(...)`, `pluginUrls(...)`, symlink handling, archive-vs-class-hierarchy behavior.
+- [`PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L392-L443): `simpleName(...)`, `prunedName(...)`, `computeAliases(...)`.
+- [`DelegatingClassLoader.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java#L194-L203): consumer of `computeAliases(...)`, showing aliases are installed into runtime resolution.
+
+**Tests to inspect or add**
+- Primary behavior coverage in [`PluginUtilsTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java#L378-L603):
+  - plugin path discovery: empty path, jars, zips, classes, ordering, absolute/relative symlinks.
+  - alias behavior: non-colliding aliases, multi-version aliasing, pruned-name collisions, simple-name collisions.
+- Neighboring consumer tests in [`DelegatingClassLoaderTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java#L170-L243):
+  - proves aliases from `PluginUtils` are usable for class loading with and without version constraints.
+- Additional integration-style alias coverage in [`PluginsTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java#L593-L608) and [`ConnectorPluginsResourceTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L333-L357).
+
+**Citations**
+- `plugin.path` / `plugin.discovery` docs: [`WorkerConfig.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L129-L154)
+- plugin path scan implementation: [`PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L203-L341)
+- alias helper implementation: [`PluginUtils.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L392-L443)
+- alias consumption: [`DelegatingClassLoader.java`](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java#L194-L203)
+- plugin-path tests: [`PluginUtilsTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java#L378-L500)
+- alias tests: [`PluginUtilsTest.java`](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java#L503-L603)
+
+**Uncertainties**
+- I did not find a separate checked-in `docs/` tree in this local snapshot, so I anchored the “version-pinned docs” on the source docstrings in `WorkerConfig.java`.
+- `computeAliases()` is well covered by unit tests, but collision handling is mostly validated indirectly through `DelegatingClassLoader` and `Plugins`; if you want stronger guarantees, add a focused test for the exact ambiguous-alias case you care about.

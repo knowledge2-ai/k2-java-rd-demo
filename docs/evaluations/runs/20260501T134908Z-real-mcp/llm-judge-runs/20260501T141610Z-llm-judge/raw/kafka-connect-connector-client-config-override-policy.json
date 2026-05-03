@@ -1,0 +1,30 @@
+{
+  "winner": "A",
+  "confidence": 0.93,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A anchors the answer in the interface, the abstract runtime validator, version-pinned 4.2 docs, and adjacent tests, which matches the requested source kinds. B likely misplaces built-in policy classes under `connect/api`, overstates runtime details without a concrete anchor, and stays vague about the validation path and exact tests. A is materially more useful for an engineer changing Java code.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Likely incorrect package/module placement for built-in policy classes (`connect/api` instead of runtime), reducing trust in the anchors.",
+      "Claims about runtime enforcement are vague and unsourced, with no concrete class or method boundary.",
+      "Test guidance is generic and less version-specific than requested.",
+      "Uses broad summaries like 'security-related subset' without pinning the exact policy behavior or neighboring tests."
+    ]
+  }
+}

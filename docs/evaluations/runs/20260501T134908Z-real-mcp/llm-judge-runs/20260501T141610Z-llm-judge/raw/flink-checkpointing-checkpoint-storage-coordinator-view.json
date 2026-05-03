@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.66,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A is closer to the likely 2.2.0 engineering anchors: it names the coordinator-view class and the most relevant runtime tests for filesystem/jobmanager storage. B is more version-pinned on docs, but its doc anchors look unverified and its test selection is less adjacent to the coordinator-view contract. Neither is perfect; A is less risky and more actionable.",
+  "critical_issues": {
+    "A": [
+      "Docs are only the release root, not the specific 2.2.0 checkpointing/state-backend pages.",
+      "It omits `CheckpointStorageWorkerView` and `CheckpointStorageAccess`, which are closer contract neighbors."
+    ],
+    "B": [
+      "The `#part-0001/#part-0016` doc anchors look unverified and may not exist on the cited pages.",
+      "`MemoryCheckpointStorageAccessTest` is not an obvious neighboring test for `CheckpointStorageCoordinatorView`.",
+      "It misses the more directly relevant `FileSystemCheckpointStorageTest` and `JobManagerCheckpointStorageTest`."
+    ]
+  }
+}

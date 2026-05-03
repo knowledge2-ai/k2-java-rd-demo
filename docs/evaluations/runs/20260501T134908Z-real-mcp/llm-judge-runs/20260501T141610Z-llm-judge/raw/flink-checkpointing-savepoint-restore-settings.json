@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.67,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 4
+    }
+  },
+  "rationale": "A is more grounded: it names the exact runtime class, the scheduler path that consumes it, and two concrete neighboring flink-runtime tests. B is directionally right but vaguer on version-pinned docs and less precise on the relevant test surface. A’s doc choices are not ideal for savepoints, but its artifact-level anchors are stronger overall.",
+  "critical_issues": {
+    "A": [
+      "Uses checkpoints/state-backends docs and a 2.0 release-notes anchor, which are only loosely related to SavepointRestoreSettings.",
+      "Does not explicitly name the savepoints docs page as the primary version-pinned anchor."
+    ],
+    "B": [
+      "Version-pinned docs are described vaguely and not tied to exact release-2.2 paths.",
+      "Misses the stronger neighboring scheduler/execution-graph test anchor and speculates about an API shape that may not exist."
+    ]
+  }
+}

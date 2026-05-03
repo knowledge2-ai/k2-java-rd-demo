@@ -1,0 +1,160 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-checkpoint-stats-tracker
+TITLE: Flink checkpointing pattern for CheckpointStatsTracker
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CheckpointStatsTracker`: explain checkpoint statistics tracking. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the version-pinned checkpointing docs plus `CheckpointStatsTracker` implementation as the primary anchor. The 2.2.0 docs show the user-facing checkpoint model, while the runtime code shows that checkpoint stats are tracked as live-updated pending stats that are finalized into completed or failed stats and then reported outward. For traces, Flink also treats the tracker as the span/event source for checkpoint lifecycle metadata [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001] [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/traces/#part-0003] [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTracker.java].
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Checkpoints overview and recovery semantics [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - Checkpointing guide under DataStream fault tolerance [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+  - Traces doc section that maps checkpoint spans/events to `CheckpointStatsTracker` and fields like start/end timestamps, checkpoint id, size, status, and type [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/traces/#part-0003]
+- Implementation class:
+  - `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTracker.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTracker.java]
+  - Supporting lifecycle object: `PendingCheckpointStats`, which is live-updated, receives subtask acknowledgements, and converts into completed/failed stats [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PendingCheckpointStats.java]
+  - Related concrete tracker implementation: `DefaultCheckpointStatsTracker`, which emits checkpoint events/spans from the collected stats [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTracker.java]
+
+**Tests to inspect or add**
+- Inspect first:
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java` for completed/failed checkpoint listener behavior [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java]
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java` for coordinator/checkpoint lifecycle interactions [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java]
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/state/TestTaskStateManager.java` for state-manager-side checkpoint plumbing [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/state/TestTaskStateManager.java]
+- Add if coverage is thin:
+  - A focused `CheckpointStatsTracker` regression test for pending-to-completed and pending-to-failed transitions if no direct coverage exists.
+  - A trace/metrics assertion test if the intent is to lock down emitted span/event attributes.
+
+**Citations**
+- Checkpoints overview: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+- DataStream checkpointing guide: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- Traces mapping for `CheckpointStatsTracker`: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/traces/#part-0003]
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTracker.java]
+- Supporting runtime stats lifecycle: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PendingCheckpointStats.java]
+- Concrete tracker implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTracker.java]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/state/TestTaskStateManager.java]
+
+**Uncertainties**
+- retrieval system did not surface a direct `CheckpointStatsTrackerTest`, so I cannot claim there is dedicated unit coverage for that class.
+- The evidence is strong for the lifecycle and emitted trace fields, but it does not expose every method on `CheckpointStatsTracker`; if you need exact method-by-method behavior, that would require a deeper code read.
+
+ANSWER B:
+**Recommendation**
+- Anchor the explanation on `DefaultCheckpointStatsTracker`: it is the concrete 2.2.0 implementation that accumulates checkpoint counts, history, summaries, metrics, spans, and REST-visible snapshots.
+- Describe the flow as: `CheckpointCoordinator` triggers `PendingCheckpoint`/`PendingCheckpointStats`, subtask acknowledgements update live stats, and completion/failure replaces the pending entry with terminal stats before `createSnapshot()` publishes a consistent view.
+- For user-facing docs in this checkout, use the REST endpoint/message classes as the version-pinned anchors for checkpointing statistics, since I did not find standalone markdown docs in the tree.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTracker.java` for the contract and callback surface.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTracker.java` for the main tracking logic, snapshotting, metrics, and tracing.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PendingCheckpointStats.java` for live per-checkpoint aggregation of subtasks and conversion to completed/failed stats.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsCounts.java` for counters.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsHistory.java` for bounded history and latest-completed/latest-failed/latest-savepoint tracking.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStatsSummary.java` for aggregate duration/size summaries.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java` for the exported snapshot shape.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/checkpoints/CheckpointingStatisticsHeaders.java` and `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/checkpoints/TaskCheckpointStatisticsHeaders.java` as the versioned REST-doc anchors.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointingStatisticsHandler.java` for the REST projection from snapshot to `/jobs/:jobid/checkpoints`.
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java` for end-to-end tracker behavior, snapshot stability, metrics, events, and spans.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PendingCheckpointStatsTest.java` for subtask accumulation and completed/failed conversion.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsCountsTest.java` for counter semantics.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshotTest.java` for snapshot serialization and field wiring.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStatsSummaryTest.java` for summary aggregation.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java` for callback wiring from coordinator to tracker.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/AbstractCheckpointStatsHandlerTest.java` for REST output and snapshot caching behavior.
+- If adding coverage, the most useful gap is a test around `reportFailedCheckpointsWithoutInProgress()` and one around the dirty-snapshot path in `createSnapshot()` under repeated reads.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTracker.java:30-44,48-103`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTracker.java:58-253,260-342,344-728`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PendingCheckpointStats.java:30-41,143-245`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsCounts.java:28-187`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsHistory.java:35-48,81-336`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStatsSummary.java:27-94`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java:27-107`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/checkpoints/CheckpointingStatisticsHeaders.java:29-76`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/checkpoints/TaskCheckpointStatisticsHeaders.java:28-80`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointingStatisticsHandler.java:58-191`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinator.java:226-289`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/PendingCheckpoint.java:422-457`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java:65-110,112-245,313-360,362-638,788-949`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PendingCheckpointStatsTest.java:35-175,177-270`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsCountsTest.java:28-152`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshotTest.java:29-79`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStatsSummaryTest.java:36-164`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorTest.java:2843-2890,3192-3320,4481-4516`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/AbstractCheckpointStatsHandlerTest.java:57-205`
+
+**Uncertainties**
+- I did not find standalone checkpointing markdown pages in this checkout, so the safest version-pinned “docs” anchors here are the REST message/header classes and their handler.
+- If you need prose docs from the published 2.2.0 website, those likely live outside this source tree and are not directly verifiable here.

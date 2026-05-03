@@ -1,0 +1,113 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-rest-connector-info
+TITLE: Kafka Connect pattern for ConnectorInfo
+QUESTION:
+For Kafka Connect REST 4.2.0, inspect `ConnectorInfo`: inspect connector info response representation. Which version-pinned docs and implementation class should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka 4.2.0 Connect REST admin docs, especially the version-pinned Administration page, and on the `ConnectorInfo` entity implementation in the 4.2 branch. That gives you both the public REST contract and the concrete response model.
+
+**Implementation anchors**
+- Public docs: `https://kafka.apache.org/42/kafka-connect/administration/#part-0001` [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Supporting docs: `https://kafka.apache.org/42/kafka-connect/overview/#part-0001` [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Implementation class: `org.apache.kafka.connect.runtime.rest.entities.ConnectorInfo` in `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java]
+
+**Tests to inspect or add**
+- Inspect REST resource tests around connector info serialization/response shape in the Connect runtime test tree.
+- If there is no direct `ConnectorInfo` test, add a focused regression test that asserts the REST response maps to `ConnectorInfo` fields and ordering/nullable behavior if relevant.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Docs: [https://kafka.apache.org/42/kafka-connect/overview/#part-0001]
+- Code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java]
+
+**Uncertainties**
+- The retrieved evidence clearly anchored the implementation class and the 4.2-pinned docs, but it did not surface a direct `ConnectorInfo`-specific test class or a dedicated doc section for the response schema. So I would treat the docs as the contract anchor and `ConnectorInfo` as the implementation anchor, with test coverage needing verification in the Connect REST resource tests.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Apache Kafka Connect REST API for **4.2.0**, not the moving latest docs. For the response shape, use the **`ConnectorInfo` entity** that backs `GET /connectors/{connector}`.
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java`
+- Version-pinned 4.2.0 Connect REST API docs for `GET /connectors/{connector}`
+- If you need the JSON shape rationale, also check the REST entity package around `org.apache.kafka.connect.runtime.rest.entities`
+
+**Tests to inspect or add**
+- Unit test for `ConnectorInfo` JSON serialization/deserialization round-trip
+- REST resource test for `GET /connectors/{name}` asserting the exact response fields and `type`
+- Regression test for any edge cases you care about, such as empty task lists or connector type mapping
+
+**Citations**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/ConnectorInfo.java`
+
+**Uncertainties**
+- I am confident about the implementation class and package path.
+- I am not fully certain of the exact published 4.2.0 docs URL layout without browsing, so I’m naming the version-pinned docs at the endpoint level rather than guessing a URL.

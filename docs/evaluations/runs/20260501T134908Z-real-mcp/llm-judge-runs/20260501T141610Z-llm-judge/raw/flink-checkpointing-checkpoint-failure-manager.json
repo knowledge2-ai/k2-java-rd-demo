@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.83,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better anchored to the Flink 2.2.0 docs, the concrete `CheckpointFailureManager` implementation, and adjacent runtime tests. It also states uncertainty instead of overclaiming. B is more generic, weak on version-pinned documentation, and admits it cannot verify the exact docs path, which lowers its value for an engineer changing Java code.",
+  "critical_issues": {
+    "A": [
+      "The docs anchor may be overly specific if the fragment ID differs, but the overall 2.2.0 checkpointing guide reference is still strong.",
+      "The named neighboring tests are plausible, but the answer should avoid implying they are the only relevant adjacent tests without verification."
+    ],
+    "B": [
+      "The docs citation is not version-pinned and is explicitly uncertain, which is weak for this question.",
+      "It does not provide concrete source artifacts beyond the main class and one test file, so it is less actionable.",
+      "The answer is too generic about failure classification and reset behavior without tying those claims to specific code or tests."
+    ]
+  }
+}

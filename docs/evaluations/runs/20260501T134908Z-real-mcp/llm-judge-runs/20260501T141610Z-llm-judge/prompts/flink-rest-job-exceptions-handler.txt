@@ -1,0 +1,124 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-exceptions-handler
+TITLE: Flink REST pattern for JobExceptionsHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobExceptionsHandler`: inspect exception response handling for a job endpoint. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Flink 2.2.0 REST API docs for job exceptions, then verify the production handler and its direct test first. The docs explicitly call out `JobExceptionsHandler` as the example handler for this REST endpoint, and the job exceptions response shape is documented in the versioned REST API page [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0027].
+
+**Implementation anchors**
+- Version-pinned docs: Flink 2.2.0 REST API docs, especially the “Developing” section that names `org.apache.flink.runtime.rest.handler.job.JobExceptionsHandler` as the example handler [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002].
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandler.java` (`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandler.java`).
+- Related message contract: `flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobExceptionsHeaders.java` (`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobExceptionsHeaders.java`).
+
+**Tests to inspect or add**
+- Direct neighbor/test anchor: `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandlerTest.java` (`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandlerTest.java`).
+- Adjacent REST handler tests for pattern comparison:
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java` (`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java`)
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobsOverviewHandlerTest.java` (`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobsOverviewHandlerTest.java`)
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java` (`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java`)
+
+**Citations**
+- REST API docs, handler guidance: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- REST API job exceptions response section: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0027]
+- `JobExceptionsHandler`: [`repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandler.java`]
+- `JobExceptionsHandlerTest`: [`repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandlerTest.java`]
+
+**Uncertainties**
+- The retrieved evidence clearly identifies the anchor classes and docs, but it does not expose the full assertion set from `JobExceptionsHandlerTest`, so I cannot safely claim which exact edge cases it covers beyond the snippet shown.
+- If you need the exact response-handling behavior at the method level, the next step is to inspect `JobExceptionsHandler.handleRequest(...)` and the corresponding test methods directly.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the Flink 2.2.0 REST API docs for the `jobs/:jobid/exceptions` endpoint and on `JobExceptionsHandler` itself.
+- For response handling, focus on the split between REST-level failures from job lookup/execution and the normal `JobExceptionsInfo` payload returned for a valid job.
+
+**Implementation anchors**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandler.java`
+- Related plumbing in the same package, if present in 2.2.0: `JobExceptionsHeaders` and `JobExceptionsInfo`
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandlerTest.java`
+- Nearby job REST handler tests in `org.apache.flink.runtime.rest.handler.job`, especially cases that cover missing-job, timeout, and handler-error translation paths
+- Add or strengthen coverage for:
+- unknown job ID
+- lookup/timeout failure
+- successful exception payload shape and ordering
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandler.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExceptionsHandlerTest.java`
+
+**Uncertainties**
+- I am not certain of the exact generated 2.2.0 REST docs URL slug without checking the published docs tree.
+- I am also not certain whether 2.2.0 includes separate `JobExceptionsHeaders` or `JobExceptionsInfo` test classes; the handler test is the stable anchor.

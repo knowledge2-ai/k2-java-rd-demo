@@ -1,0 +1,136 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-worker
+TITLE: Kafka Connect pattern for Worker
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Worker`: trace connector and task lifecycle responsibilities. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Anchor the answer on Kafka Connect’s 4.2.0 docs and the runtime `Worker` class.
+- Treat `Worker` as the orchestration layer: it owns connector/task start-stop sequencing, status transitions, callbacks, and failure handling, while the connector/task implementations own their own business logic.
+- For a lifecycle trace, follow `Worker` into the connector wrappers and task runners rather than trying to infer behavior from the herder alone.
+
+**Implementation anchors**
+- Version-pinned docs: Apache Kafka 4.2.0 docs root, `https://kafka.apache.org/42/documentation/`  
+- Implementation class: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java`
+- Adjacent runtime classes worth reading alongside it:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConnector.java`
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSinkTask.java`
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java`
+
+**Tests to inspect or add**
+- Inspect first:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java`
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java`
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java`
+- If present in the 4.2.0 tree, also inspect connector-facing worker tests such as `WorkerConnectorTest.java`.
+- Good regression coverage to add:
+  - connector start/stop success and failure transitions
+  - task start/stop/restart sequencing
+  - shutdown ordering and callback propagation
+  - error-path behavior when connector/task init fails partway through lifecycle
+
+**Citations**
+- `https://kafka.apache.org/42/documentation/`
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java`
+
+**Uncertainties**
+- I cannot verify the exact Connect-doc section anchor for 4.2.0 without browsing.
+- I’m confident about `Worker` and the task tests above, but I’m not certain whether `WorkerConnectorTest.java` exists in the 4.2.0 branch, so treat that one as “check if present.”
+
+ANSWER B:
+**Recommendation**
+Use the 4.2.0 Kafka Connect docs plus the runtime lifecycle tracker as the anchor set. The retrieved evidence points to the public Connect docs and, for implementation, to `AbstractHerder` as the class that handles connector/task lifecycle tracking; retrieval system did not surface a direct `Worker` source hit, so treat that as the nearest implementation anchor rather than guessing a file path [https://kafka.apache.org/42/kafka-connect/], [https://kafka.apache.org/42/kafka-connect/connector-development-guide/], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java].
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect landing page for 4.2.0 [https://kafka.apache.org/42/kafka-connect/]
+  - Connector Development Guide for connector/task model and lifecycle concepts [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+  - Connect API overview for runtime-facing connector behavior [https://kafka.apache.org/42/apis/#part-0003]
+- Implementation class:
+  - `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java` because its class comment explicitly says it “handles connector/task lifecycle tracking” and that extensions must invoke lifecycle hooks appropriately [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java` since it exercises connector/task restart behavior and offsets handling in a worker-managed lifecycle path [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+- If you want direct `Worker`-focused coverage, add or locate a runtime test that asserts start/stop/rebalance transitions for connectors and tasks; retrieval system did not surface a specific `Worker*Test` in the returned evidence.
+
+**Citations**
+- Kafka Connect 4.2 docs: [https://kafka.apache.org/42/kafka-connect/]
+- Connector Development Guide: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+- Connect API: [https://kafka.apache.org/42/apis/#part-0003]
+- Lifecycle-tracking implementation anchor: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/AbstractHerder.java]
+- Neighboring test anchor: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- retrieval did not return a direct `Worker` class source hit, so the exact worker implementation file remains unconfirmed from this evidence alone.
+- retrieval system also did not surface a dedicated `Worker` unit test; only a nearby integration test was returned.

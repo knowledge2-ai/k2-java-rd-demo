@@ -1,0 +1,32 @@
+{
+  "winner": "B",
+  "confidence": 0.86,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    }
+  },
+  "rationale": "B is better anchored for Kafka Connect 4.2.0: it names version-pinned docs, the `ConnectorConfig` implementation, and nearby tests, which is what an engineer needs. A is cautious but too generic, omits the doc anchors the question explicitly asks for, and relies on hedged uncertainty instead of concrete source artifacts.",
+  "critical_issues": {
+    "A": [
+      "Does not identify the version-pinned docs the question explicitly asks for.",
+      "Too vague about the validation mechanism and call path; little concrete source grounding.",
+      "Herder tests are listed, but the answer does not explain why they are the nearest anchors versus other runtime tests."
+    ],
+    "B": [
+      "Some claims about `ConnectorConfig$PluginVersionValidator` and the exact doc anchors are not independently justified in the answer.",
+      "Could have been more explicit about which shared validation rules live in `ConnectorConfig` versus connector-specific config classes."
+    ]
+  }
+}

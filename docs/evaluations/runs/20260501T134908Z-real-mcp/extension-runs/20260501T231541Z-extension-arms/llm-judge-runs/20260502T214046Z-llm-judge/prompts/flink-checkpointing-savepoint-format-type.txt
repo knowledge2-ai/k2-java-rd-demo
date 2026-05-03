@@ -1,0 +1,142 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-savepoint-format-type
+TITLE: Flink checkpointing pattern for SavepointFormatType
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `SavepointFormatType`: explain savepoint format choices. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-core"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use `CANONICAL` as the safe/default savepoint format when you want portability across state backends. Treat `NATIVE` as a backend-specific format that is serialized/deserialized in the runtime, but is not the default supported path for all backends. That matches the backend gate in `StateBackend.supportsSavepointFormat(...)`, which returns true only for `CANONICAL` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/StateBackend.java]. The docs also say Flink unified the binary savepoint format starting in 1.13, which is the portability baseline to cite [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0006].
+
+**Implementation anchors**
+- `SavepointFormatType` itself: the version-pinned enum in `flink-core` [repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/core/execution/SavepointFormatType.java].
+- `StateBackend.supportsSavepointFormat(...)`: default support is only `CANONICAL` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/StateBackend.java].
+- `EventSerializer.decodeSavepointType(...)`: runtime wire decoding accepts both `CANONICAL` and `NATIVE` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/api/serialization/EventSerializer.java].
+- `CheckpointProperties.forSyncSavepoint(...)` and `forUnclaimedSnapshot()`: savepoint creation flows thread the format type through, and unclaimed snapshots are forced to `CANONICAL` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java].
+- Version-pinned docs to cite alongside the code:
+  - Checkpoints overview [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - State backends / savepoint format unification note [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0006]
+
+**Tests to inspect or add**
+- `EventSerializerTest`: exercises both `SavepointType.terminate(SavepointFormatType.CANONICAL)` and `SavepointType.savepoint/suspend(SavepointFormatType.NATIVE)` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/io/network/api/serialization/EventSerializerTest.java].
+- `PendingCheckpointTest`: verifies savepoint-related checkpoint properties with `CANONICAL` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PendingCheckpointTest.java].
+- `CheckpointMetadataLoadingTest`: validates savepoint loading using `CANONICAL` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetadataLoadingTest.java].
+- If you want tighter coverage, add a dedicated `SavepointFormatTypeTest` or extend `EventSerializerTest` to assert any enum-to-wire mapping explicitly. retrieval system did not surface a dedicated `SavepointFormatTypeTest`.
+
+**Citations**
+- `SavepointFormatType`: [repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/core/execution/SavepointFormatType.java]
+- `StateBackend.supportsSavepointFormat(...)`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/StateBackend.java]
+- `EventSerializer`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/api/serialization/EventSerializer.java]
+- `CheckpointProperties`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointProperties.java]
+- `EventSerializerTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/io/network/api/serialization/EventSerializerTest.java]
+- `PendingCheckpointTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/PendingCheckpointTest.java]
+- `CheckpointMetadataLoadingTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointMetadataLoadingTest.java]
+- Docs:
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0006]
+
+**Uncertainties**
+- The retrieval system snippets did not expose the full body of `SavepointFormatType.java`, so I’m relying on the runtime call sites and tests for the exact behavior rather than enumerating every enum member from the file itself.
+- I did not find a dedicated `SavepointFormatTypeTest`; if one exists outside the surfaced results, retrieval system didn’t return it.
+
+ANSWER B:
+**Recommendation**
+- Prefer `SavepointFormatType.CANONICAL` as the default. In 2.2.0, `DEFAULT` is just an alias for `CANONICAL`, and the enum describes it as backend-agnostic and portable across state backends.
+- Use `SavepointFormatType.NATIVE` only when you explicitly want backend-native savepoints and the selected backend supports them. The runtime checks this at snapshot time and rejects unsupported formats.
+- Practical rule: canonical for portability and safer upgrades/migrations; native for potential speed/size benefits on compatible backends.
+
+**Implementation anchors**
+- Public format enum and its docs: `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/core/execution/SavepointFormatType.java:28`, `:31`, `:35`, `:43`
+- Public API entry points that carry the format through savepoint requests: `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/core/execution/JobClient.java:44`, `:63`
+- REST request bodies that default missing format to `DEFAULT`: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerRequestBody.java:33`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/stop/StopWithSavepointRequestBody.java:33`
+- REST handlers that forward the chosen format to the gateway: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java:212`, `:256`
+- Runtime compatibility gate: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/runtime/tasks/StreamTask.java:1501`
+- Backend support contract and default behavior: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/StateBackend.java:172`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/hashmap/HashMapStateBackend.java:91`
+
+**Tests to inspect or add**
+- Format propagation and defaulting through snapshot lifecycle: `repo://apache/flink@release-2.2.0/flink-libraries/flink-state-processing-api/src/test/java/org/apache/flink/state/api/output/SnapshotUtilsTest.java:59`
+- REST body marshalling for trigger savepoints: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerRequestBodyTest.java:46`
+- REST body marshalling for stop-with-savepoint: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/StopWithSavepointTriggerRequestBodyTest.java:47`
+- REST handler forwarding of format and defaults: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java:228`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/StopWithSavepointHandlersTest.java:228`
+- Serialization coverage for both canonical and native formats: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/io/network/api/serialization/EventSerializerTest.java:56`
+- Metadata serialization coverage for native savepoints: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/metadata/MetadataV4SerializerTest.java:37`
+- Savepoint properties behavior and alignment expectations: `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointOptionsTest.java:51`
+
+**Citations**
+- `SavepointFormatType` enum docs and default alias: `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/core/execution/SavepointFormatType.java:28`, `:31`, `:35`, `:43`
+- `JobClient` public API docs: `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/core/execution/JobClient.java:44`, `:63`
+- REST request-body defaults and forwarding: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerRequestBody.java:58`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/job/savepoints/stop/StopWithSavepointRequestBody.java:59`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlers.java:212`, `:256`
+- Runtime support gate: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/runtime/tasks/StreamTask.java:1501`
+- Backend support contract: `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/StateBackend.java:172`, `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/hashmap/HashMapStateBackend.java:91`
+- Behavior tests: `repo://apache/flink@release-2.2.0/flink-libraries/flink-state-processing-api/src/test/java/org/apache/flink/state/api/output/SnapshotUtilsTest.java:59`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/SavepointTriggerRequestBodyTest.java:46`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/job/savepoints/StopWithSavepointTriggerRequestBodyTest.java:47`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java:228`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/StopWithSavepointHandlersTest.java:228`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/io/network/api/serialization/EventSerializerTest.java:56`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/metadata/MetadataV4SerializerTest.java:37`, `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointOptionsTest.java:51`
+
+**Uncertainties**
+- I did not find a separate `flink-docs` markdown/adoc page dedicated to `SavepointFormatType` in this checkout. The authoritative 2.2.0 anchors are the public source Javadocs and the REST/API classes above.
+- I did not verify backend-specific native support beyond `HashMapStateBackend`; the generic contract still says backends default to canonical-only unless they override `supportsSavepointFormat`.

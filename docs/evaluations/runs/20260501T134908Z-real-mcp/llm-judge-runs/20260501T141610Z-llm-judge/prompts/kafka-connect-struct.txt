@@ -1,0 +1,129 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-struct
+TITLE: Kafka Connect pattern for Struct
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Struct`: inspect structured Connect data validation. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs plus the `Struct` implementation as the primary anchors, and treat the absence of a surfaced `Struct`-specific test as a gap to verify in-repo.
+
+**Implementation anchors**
+- Kafka Connect 4.2 overview for the versioned Connect entry point: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+- Connector Development Guide section that explicitly introduces `Schema` and `Struct` for structured records: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0021](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0021)
+- Connect API docs landing page for the versioned API surface: [https://kafka.apache.org/42/apis/#part-0003](https://kafka.apache.org/42/apis/#part-0003)
+- Implementation class to inspect: `org.apache.kafka.connect.data.Struct` at `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/Struct.java`
+- Adjacent data-validation helper surfaced by retrieval system: `SchemaBuilder.field(...)` in `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/SchemaBuilder.java`
+
+**Tests to inspect or add**
+- Existing Connect test anchor surfaced by retrieval system: `ConnectorValidationIntegrationTest` at `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java`
+- Another nearby Connect integration test surfaced by retrieval system: `ExactlyOnceSourceIntegrationTest` at `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`
+- Add or locate a focused unit test class for `Struct` validation if one exists but was not surfaced by retrieval system; the returned evidence did not include a direct `Struct`-specific test file.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/), [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0021](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0021), [https://kafka.apache.org/42/apis/#part-0003](https://kafka.apache.org/42/apis/#part-0003)
+- Code: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/Struct.java`, `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/SchemaBuilder.java`
+- Tests: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java`, `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java`
+
+**Uncertainties**
+- retrieval system did not surface a `Struct`-specific test class or method-level validation assertions, so I cannot claim the exact neighboring unit tests without guessing.
+- The evidence supports `Struct` as the implementation anchor, but the precise validation behavior should be confirmed directly in that file if you need method-level claims.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on Kafka Connect 4.2.0 Javadocs for `org.apache.kafka.connect.data.Struct` and `org.apache.kafka.connect.data.Schema`, then confirm behavior in the `Struct` implementation itself. For validation semantics, `Struct` is the primary entry point, with schema/type enforcement flowing through the Connect data model.
+
+**Implementation anchors**
+- `connect/api/src/main/java/org/apache/kafka/connect/data/Struct.java`
+- If you need the lower-level schema rules behind `Struct`, also inspect `connect/api/src/main/java/org/apache/kafka/connect/data/ConnectSchema.java`
+- Version-pinned docs: Kafka 4.2.0 Javadocs for `org.apache.kafka.connect.data.Struct` and `org.apache.kafka.connect.data.Schema`
+
+**Tests to inspect or add**
+- `connect/api/src/test/java/org/apache/kafka/connect/data/StructTest.java`
+- `connect/api/src/test/java/org/apache/kafka/connect/data/SchemaBuilderTest.java`
+- `connect/api/src/test/java/org/apache/kafka/connect/data/ConnectSchemaTest.java`
+- If adding coverage, target:
+  - required vs optional field validation
+  - null handling
+  - type mismatch rejection
+  - nested `Struct` validation
+  - default values and missing fields
+
+**Citations**
+- Kafka Connect 4.2.0 Javadocs: `org.apache.kafka.connect.data.Struct`
+- Kafka Connect 4.2.0 Javadocs: `org.apache.kafka.connect.data.Schema`
+- Source: `connect/api/src/main/java/org/apache/kafka/connect/data/Struct.java`
+- Tests: `connect/api/src/test/java/org/apache/kafka/connect/data/StructTest.java`
+- Tests: `connect/api/src/test/java/org/apache/kafka/connect/data/SchemaBuilderTest.java`
+- Tests: `connect/api/src/test/java/org/apache/kafka/connect/data/ConnectSchemaTest.java`
+
+**Uncertainties**
+- I am not certain of the exact public 4.2.0 docs URL without browsing, but the class names above are the stable version-pinned anchors.
+- If the validation path in your question is specifically about nested schema enforcement, `ConnectSchema` may matter as much as `Struct` itself.

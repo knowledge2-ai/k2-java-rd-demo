@@ -1,0 +1,22 @@
+You are Codex in a controlled evaluation with local repository access, but WITHOUT K2 or MCP tools.
+Use shell/file reads only for local retrieval. Do not browse and do not use web search. Prefer `rg` for search, inspect source/tests before answering, and cite exact repo-relative paths you verified.
+
+Available source checkouts:
+- Apache Flink 2.2.0 root: /tmp/k2-java-rd-demo-sources/apache-flink-release-2.2.0
+  Citation prefix: repo://apache/flink@release-2.2.0/
+  Public GitHub prefix: https://github.com/apache/flink/blob/5a336892424a9458653ead89610bf60d771ab8d7/
+- Apache Kafka 4.2 root: /tmp/k2-java-rd-demo-sources/apache-kafka-4.2
+  Citation prefix: repo://apache/kafka@4.2/
+  Public GitHub prefix: https://github.com/apache/kafka/blob/ba74c3a289456f7346f2bece2cf76fcae55be9a4/
+
+When citing a file in the final answer, prefer the public GitHub prefix plus the repo-relative path and line fragment when available. Keep repo:// citations only as internal fallback identifiers.
+
+Customer question:
+For Flink REST API 2.2.0, inspect `JobPlanHandler`: explain how plan metadata is returned through a REST handler. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+Return a concise engineering answer with these headings:
+Recommendation
+Implementation anchors
+Tests to inspect or add
+Citations
+Uncertainties

@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.93,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 1,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A is better anchored to Flink 2.2.0 artifacts: version-pinned REST docs, the likely correct `flink-runtime` handler and headers classes, and neighboring REST tests. B has likely-wrong module paths (`flink-runtime-web`) and only generic behavior claims, so it is less reliable for an engineer editing the code.",
+  "critical_issues": {
+    "A": [
+      "Test neighbors are plausible but not strongly proven as the closest suite for `JobPlanHandler`.",
+      "Some doc section anchors look brittle if those fragment IDs changed."
+    ],
+    "B": [
+      "Likely wrong module path: Flink REST handlers are in `flink-runtime`, not `flink-runtime-web`.",
+      "Response DTO/package path is hedged and may be fabricated or outdated.",
+      "Does not name concrete implementation anchors with the same confidence as A."
+    ]
+  }
+}

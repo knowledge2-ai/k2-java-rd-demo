@@ -1,0 +1,33 @@
+{
+  "winner": "B",
+  "confidence": 0.76,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    }
+  },
+  "rationale": "B is more anchored to version-pinned Flink 2.2.0 artifacts, names the interface, concrete implementation, and neighboring test classes, and includes uncertainty about coverage gaps. A is more cautious, but it is vaguer and relies on speculative test/class names without as much source anchoring.",
+  "critical_issues": {
+    "A": [
+      "Relies on speculative implementation/test names like `StandaloneCheckpointIDCounterTest` and `ZooKeeperCheckpointIDCounterTest` without evidence they exist in 2.2.0.",
+      "Does not name the version-pinned docs or concrete neighboring tests as precisely as requested.",
+      "Too generic for an engineer trying to change Java code in `flink-runtime`."
+    ],
+    "B": [
+      "States concrete allocation semantics for the standalone counter without showing the underlying method body, so the claim may be slightly overconfident.",
+      "Cites specific doc URLs and repo URIs that may not exactly match the 2.2.0 source layout.",
+      "Mentions `ZooKeeperCheckpointIDCounter` and direct test gaps without proving those exact artifacts exist in the release."
+    ]
+  }
+}

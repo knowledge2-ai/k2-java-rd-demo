@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.92,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A is better grounded in Flink 2.2.0 artifacts: it names the version-pinned REST docs, the concrete handler class, and a direct test plus neighboring tests. B is weaker because it cannot verify the docs URL, uses a likely wrong package path (`job/vertex`), and stays too vague to guide code changes.",
+  "critical_issues": {
+    "A": [
+      "Neighbor test choices include at least one less directly related file (`JobConfigHandlerTest`), so that part should be treated as illustrative rather than authoritative.",
+      "It does not pin the exact handler registration site in the REST endpoint bootstrap."
+    ],
+    "B": [
+      "Does not provide a verified version-pinned docs anchor, which is explicitly requested.",
+      "Likely hallucinates the source path/package as `handler/job/vertex` instead of the handler package used by Flink's REST job handlers.",
+      "Admits it cannot verify the exact route string, so it is not reliable for an engineer changing Java code."
+    ]
+  }
+}

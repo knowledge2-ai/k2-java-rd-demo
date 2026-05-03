@@ -1,0 +1,126 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-schemas
+TITLE: Kafka Connect pattern for Schema
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Schema`: inspect Connect schema representation. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs for the public contract, then anchor the implementation discussion on `org.apache.kafka.connect.data.ConnectSchema`, with `SchemaBuilder` and `Struct` as the adjacent data-model types. retrieval system did not surface a direct `Schema` unit test in the Connect API package, so treat that as a gap and add one if you need precise regression coverage.
+
+**Implementation anchors**
+- Docs: Kafka 4.2 Connect landing page and Connect guide pages are the version-pinned public anchors for the API surface [https://kafka.apache.org/42/kafka-connect/], [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001], [https://kafka.apache.org/42/apis/#part-0001].
+- Concrete schema representation: `ConnectSchema` is the concrete class retrieval system surfaced as implementing `Schema` [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/ConnectSchema.java].
+- Adjacent model helpers: `SchemaBuilder` is the fluent construction path, and `Struct` is the companion record carrier for structured data [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/SchemaBuilder.java], [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/Struct.java].
+
+**Tests to inspect or add**
+- Inspect nearby Connect runtime tests that already exercise schema-adjacent behavior: `PluginUtilsTest`, `FloatConverterTest`, `DoubleConverterTest`, and `LongConverterTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/FloatConverterTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/DoubleConverterTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/LongConverterTest.java].
+- Add a direct schema-focused unit test if one does not already exist, ideally under `connect/api/src/test/java/org/apache/kafka/connect/data/` for `ConnectSchema` / `SchemaBuilder` coverage.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/], [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001], [https://kafka.apache.org/42/apis/#part-0001]
+- Implementation: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/ConnectSchema.java], [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/SchemaBuilder.java], [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/Struct.java]
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/FloatConverterTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/DoubleConverterTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/LongConverterTest.java]
+
+**Uncertainties**
+- retrieval system did not surface a dedicated `ConnectSchemaTest` or `SchemaBuilderTest` in the 4.2.0 Connect API tree, so I cannot claim one exists from this evidence.
+- The surfaced neighboring tests are schema-adjacent, not direct `Schema` representation tests, so they are only a partial anchor for regression coverage.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the Connect source Javadocs in `Schema.java` and `SchemaBuilder.java`, then point to `ConnectSchema.java` as the concrete representation. In this checkout, that is the authoritative 4.2.0 material; I did not find a separate rendered docs tree to cite instead.
+- Use the runtime converter tests as the nearest behavior anchors, since `connect/api` has no local `src/test/java` tree here.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/Schema.java#L25-L218` — API contract, schema types, and built-in schema constants.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/SchemaBuilder.java#L416-L433` — `build()` materializes a `ConnectSchema`.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/ConnectSchema.java#L31-L303` — concrete schema representation, validation, and `schema()` returning `this`.
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/package-info.java#L18-L19` — package-level overview for the Connect data model.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/ByteArrayConverterTest.java#L48-L120` — bytes schema constants, null handling, and `Schema.OPTIONAL_BYTES_SCHEMA`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/BooleanConverterTest.java#L48-L113` — boolean schema constants and optional/null behavior.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/ShortConverterTest.java#L23-L42` and `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/IntegerConverterTest.java#L23-L42` — concrete numeric schema anchors via `NumberConverterTest`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java#L130-L151` — verifies the isolated Connect package includes `ConnectSchema`, `Schema`, `SchemaBuilder`, `SchemaProjector`, and related exceptions.
+- If you want direct API-level coverage, add `repo://apache/kafka@4.2/connect/api/src/test/java/org/apache/kafka/connect/data/ConnectSchemaTest.java` and/or `SchemaBuilderTest.java`; that test tree does not exist in this checkout today.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/Schema.java#L25-L218`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/SchemaBuilder.java#L416-L433`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/data/ConnectSchema.java#L31-L303`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/ByteArrayConverterTest.java#L48-L120`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/BooleanConverterTest.java#L48-L113`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/ShortConverterTest.java#L23-L42`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/converters/IntegerConverterTest.java#L23-L42`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java#L130-L151`
+
+**Uncertainties**
+- There is no dedicated `connect/api/src/test/java` tree in this checkout, so direct `ConnectSchema` unit tests are missing here.
+- If the question is really about schema projection or compatibility rather than representation, `SchemaProjector.java` should be added to the anchor set.

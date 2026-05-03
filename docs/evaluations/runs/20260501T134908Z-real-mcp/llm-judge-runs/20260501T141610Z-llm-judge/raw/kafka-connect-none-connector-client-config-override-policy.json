@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.9,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A is better anchored for Kafka Connect 4.2.0: it names the exact runtime class, version-pinned docs, and concrete neighboring tests, and it explicitly marks uncertainty. B gets the behavior mostly right, but its doc anchor is too generic and its test guidance is non-specific, making it less useful for an engineer changing the Java code.",
+  "critical_issues": {
+    "A": [
+      "Does not explicitly name `AllowlistConnectorClientConfigOverridePolicyTest`, which is the most direct 4.2 neighboring test for the allowlist policy."
+    ],
+    "B": [
+      "Uses an imprecise docs anchor (`https://kafka.apache.org/42/documentation/`) instead of the versioned Kafka Connect config/user-guide pages.",
+      "Does not name the key neighboring test classes or the exact policy classes in enough detail.",
+      "Relies on generic directory guidance where the question asked for concrete version-pinned anchors."
+    ]
+  }
+}

@@ -1,0 +1,131 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-connector
+TITLE: Kafka Connect pattern for Connector
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Connector`: inspect the base connector contract. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the source Javadocs, not a separate docs tree. In this checkout, the base `Connector` contract is documented directly in `connect/api`, and the version contract comes from `Versioned`. For behavior, use the runtime tests that hit `validate()`, `version()`, `initialize()`, and `reconfigure()`.
+
+**Implementation anchors**
+- Base contract: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java`
+- Version contract: `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/components/Versioned.java`
+- Specialization docs that sit next to the base class:
+  - `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java`
+  - `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java`
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java` for the `putConnectorConfig` path that calls `connector.validate()` and `connector.config()`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java` for lifecycle + `version()` propagation during initialization.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/BlockingConnectorTest.java` for direct blocking coverage of `Connector::validate`, `Connector::config`, `Connector::initialize`, `Connector::reconfigure`, and `Connector::version`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java` for connector config validation and plugin metadata/version surfacing.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java` for versioned vs unversioned plugin scanning.
+- If you want a minimal local unit anchor, `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java` is the nearest test file with an inline `Connector` subclass, but it is more about config assembly than the base contract itself.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java:28-45, 56-152`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/components/Versioned.java:20-29`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java:23-76`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/sink/SinkConnector.java:24-83`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java:181-200, 853-908`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java:118-190, 629-636`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/BlockingConnectorTest.java:145-185, 532-606, 886-890`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java:221-275, 370-380`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java:125-140`
+
+**Uncertainties**
+- I did not find a separate checked-in `docs/` tree in this Kafka 4.2 checkout, so the authoritative “docs” here are the Javadocs on the source files above.
+- `Connector.java` itself has no `@since` tags; the version-pinned behavior is mainly expressed on the adjacent `SourceConnector`/`SinkConnector` APIs and through `Versioned`.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the version-pinned Kafka 4.2 docs plus the abstract base class itself. The most defensible framing is: the `Connector` contract lives in `org.apache.kafka.connect.connector.Connector`, and the public documentation for Kafka Connect 4.2.0 explains how connectors are developed and configured [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/) [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/). The config contract also explicitly says `connector.class` must be a subclass of `org.apache.kafka.connect.connector.Connector` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java].
+
+**Implementation anchors**
+- Base API contract: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java]
+- Config/registration contract: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+- Version-pinned docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/) and [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+
+**Tests to inspect or add**
+- Inspect the validation-focused integration coverage surfaced by retrieval system: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+- Also inspect the nearby runtime behavior coverage: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+- If you are tightening the base contract itself, add or extend a direct unit test around `Connector` lifecycle/default-method behavior. retrieval system did not surface a dedicated `Connector` unit test, so that gap remains.
+
+**Citations**
+- [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- retrieval returned strong anchors for docs, the base class, and adjacent integration tests, but it did not surface a direct `Connector`-specific unit test suite. I would treat the direct test anchor as incomplete unless you want a deeper targeted search for `ConnectorTest` or lifecycle-focused unit tests.

@@ -1,0 +1,153 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-completed-checkpoint-store
+TITLE: Flink checkpointing pattern for CompletedCheckpointStore
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CompletedCheckpointStore`: inspect how completed checkpoints are retained. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the source Javadocs/config options in this 2.2.0 tree as the pinned docs, and anchor the answer on the retention contract plus the helper that actually subsumes old checkpoints. The important distinction is:
+- store retention = bounded LIFO queue of completed checkpoints
+- externalized checkpoint cleanup = separate `CheckpointConfig` concern
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java#L98-L105`  
+  Config doc for `execution.checkpointing.num-retained` and its default of `1`.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStore.java#L37-L61`  
+  Interface contract: when the max retained count is exceeded, the oldest completed checkpoint is discarded.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreUtils.java#L51-L78`  
+  Maps config to the retention bound and falls back to the default when the configured value is invalid.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointSubsumeHelper.java#L27-L107`  
+  The real subsumption rules: savepoints are handled specially, the latest non-savepoint is protected, and only excess checkpoints are removed.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java#L42-L218`  
+  Main persistent implementation: add, subsume oldest, clean shared state, and clear/release on shutdown.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStore.java#L42-L189`  
+  No-HA in-memory implementation with the same retention semantics.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/api/environment/CheckpointConfig.java#L380-L403`  
+  Separate doc for externalized checkpoint retention on job cancellation; useful to avoid conflating it with retained completed checkpoints.
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStoreTest.java#L37-L205`  
+  Base contract tests for add/get/latest/retention/discard behavior.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStoreTest.java#L38-L122`  
+  Standalone shutdown and discard behavior.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java#L84-L345`  
+  Retention edge cases, recovery ordering, add-failure behavior, and shutdown semantics.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreTest.java#L123-L187`  
+  Subsumed checkpoint discard and shutdown discard for the ZK-backed store.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreITCase.java#L98-L240`  
+  Recovery behavior and “older checkpoints are not cleaned up immediately” coverage.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-core/src/main/java/org/apache/flink/configuration/CheckpointingOptions.java#L98-L105`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStore.java#L37-L61`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreUtils.java#L51-L78`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointSubsumeHelper.java#L27-L107`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java#L42-L218`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStore.java#L42-L189`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/streaming/api/environment/CheckpointConfig.java#L380-L403`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStoreTest.java#L37-L205`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStoreTest.java#L38-L122`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java#L84-L345`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreTest.java#L123-L187`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreITCase.java#L98-L240`
+
+**Uncertainties**
+- I did not find a separate markdown/asciidoc checkpointing doc page in this checkout; the stable, version-pinned documentation here is the source Javadoc/config-option text.
+- If you want the no-HA path specifically, `StandaloneCompletedCheckpointStore` is the right concrete class; if you want the default/recovery-backed path, `DefaultCompletedCheckpointStore` plus `CheckpointSubsumeHelper` is the core pair.
+
+ANSWER B:
+**Recommendation**
+Use `CompletedCheckpointStore` as the contract, `DefaultCompletedCheckpointStore` as the main retention implementation, and `CompletedCheckpointStoreTest` plus the store-specific subclasses as the behavioral anchor. For docs, anchor on the Flink 2.2.0 checkpointing/state-backend docs that explain retained completed checkpoint metadata and checkpoint storage behavior. The evidence shows retention is implemented as a bounded history: older checkpoints are subsumed/removed when new ones are added, and on recovery only the latest persisted checkpoint is kept if multiple are present.
+
+**Implementation anchors**
+- Contract: [`CompletedCheckpointStore`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStore.java)
+- Primary retention implementation: [`DefaultCompletedCheckpointStore`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java)
+- HA-off variant with explicit max retention: [`StandaloneCompletedCheckpointStore`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStore.java)
+- Related persistence/storage context: [`FileSystemCheckpointStorage`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/storage/FileSystemCheckpointStorage.java)
+
+**Tests to inspect or add**
+- Base contract coverage: [`CompletedCheckpointStoreTest`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStoreTest.java)
+- Default store behavior and recovery ordering: [`DefaultCompletedCheckpointStoreTest`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java)
+- Store-specific retention behavior: [`ZooKeeperCompletedCheckpointStoreTest`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreTest.java)
+- Test helper / fake implementation if you need to extend coverage: [`TestingCompletedCheckpointStore`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/TestingCompletedCheckpointStore.java)
+
+**Citations**
+- Version-pinned docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001)
+- Version-pinned docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001)
+- Implementation: [`CompletedCheckpointStore`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStore.java)
+- Implementation: [`DefaultCompletedCheckpointStore`](repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java)
+- Test: [`CompletedCheckpointStoreTest`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStoreTest.java)
+- Test: [`DefaultCompletedCheckpointStoreTest`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java)
+- Test: [`ZooKeeperCompletedCheckpointStoreTest`](repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/ZooKeeperCompletedCheckpointStoreTest.java)
+
+**Uncertainties**
+- The retrieved evidence clearly surfaced the contract, main implementation, and neighboring tests, but it did not expose the full `DefaultCompletedCheckpointStore` retention method body. I can anchor the answer, but I cannot quote exact retention logic beyond what the surfaced evidence states.
+- The docs returned are relevant checkpointing/state-backend anchors, but they are indirect; the evidence did not surface a doc page dedicated specifically to `CompletedCheckpointStore` retention.

@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.94,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 1,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is materially better: it pins the Flink 2.2 docs, names the implementation class, and gives a direct test anchor plus same-package comparators. B is vague, explicitly uncertain about the docs slug, and does not provide a versioned docs anchor or concrete neighboring tests, which makes it less reliable for an engineer changing Java code.",
+  "critical_issues": {
+    "A": [
+      "The extra neighboring tests are plausible but not clearly the closest exception-handling neighbors, so they may distract from the direct handler/test pair.",
+      "The docs fragment anchors look specific but are not independently verified here."
+    ],
+    "B": [
+      "No version-pinned docs URI is given, which is the main thing the question asked for.",
+      "It stays generic about neighboring tests and does not anchor the answer in concrete source artifacts.",
+      "It introduces unverified `JobExceptionsInfo`/error-translation framing without source support."
+    ]
+  }
+}

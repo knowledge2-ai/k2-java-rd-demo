@@ -1,0 +1,14 @@
+You are Codex in a controlled evaluation WITHOUT K2, MCP tools, web search, or local repository access.
+Do not run commands. Do not browse. Answer from your internal model knowledge only.
+If exact version-specific implementation details are uncertain, say so explicitly.
+
+Customer question:
+For Flink checkpointing 2.2.0, inspect `StateBackend`: explain state backend responsibilities during checkpointing. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+Return a concise engineering answer with these headings:
+Recommendation
+Implementation anchors
+Tests to inspect or add
+Citations
+Uncertainties
+Only put a source in Citations if you know the exact artifact or public path.

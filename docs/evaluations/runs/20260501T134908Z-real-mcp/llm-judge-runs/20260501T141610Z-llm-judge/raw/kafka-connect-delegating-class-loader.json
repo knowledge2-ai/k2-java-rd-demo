@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.96,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 1,
+      "specificity": 1,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is materially better grounded: it names the exact 4.2-pinned docs, the implementation class, and adjacent tests in `connect/runtime`. B stays generic, omits version-pinned URLs, and gives no concrete test or source anchors. A still has minor uncertainty where some docs are contextual rather than direct specs, but it is much more actionable for a Java engineer.",
+  "critical_issues": {
+    "A": [
+      "Some cited docs are contextual anchors rather than direct documentation of `DelegatingClassLoader` behavior.",
+      "The neighbor test `SynchronizationTest` may need filename verification before relying on it."
+    ],
+    "B": [
+      "No version-pinned Kafka 4.2.0 doc URLs, so the answer is not source-specific enough.",
+      "No concrete implementation or test filenames beyond the class name, making it weak for code changes.",
+      "Generic claims about plugin discovery and resource lookup are unsupported by cited artifacts."
+    ]
+  }
+}

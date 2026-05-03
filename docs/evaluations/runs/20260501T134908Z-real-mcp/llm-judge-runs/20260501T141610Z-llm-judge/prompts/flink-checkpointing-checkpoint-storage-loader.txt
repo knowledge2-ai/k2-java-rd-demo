@@ -1,0 +1,135 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-checkpoint-storage-loader
+TITLE: Flink checkpointing pattern for CheckpointStorageLoader
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CheckpointStorageLoader`: explain checkpoint storage loading during configuration. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the explanation on the 2.2.0 checkpointing docs and the `CheckpointStorageLoader` implementation, then validate behavior against `CheckpointStorageLoaderTest`. The safest documented framing is: checkpoint storage is configured via checkpointing/state-backend configuration, and the loader class is the runtime utility that resolves the configured storage from those configs [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001] [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001] [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/CheckpointStorageLoader.java].
+
+**Implementation anchors**
+- Docs:
+  - `Checkpoints` docs page for the storage concept and user-facing configuration context [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - `State Backends` docs page for how checkpointed state is persisted [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001]
+  - `Checkpointing` guide for config-level semantics [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- Implementation class:
+  - `CheckpointStorageLoader` in `flink-runtime`, which retrieval system identifies as the utility class that “load[s] checkpoint storage from configurations” [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/CheckpointStorageLoader.java]
+- Nearby implementation context:
+  - `FileSystemCheckpointStorage` as the storage backend class the loader can resolve to, for filesystem-backed checkpoint persistence [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/storage/FileSystemCheckpointStorage.java]
+  - `Checkpoints` as a neighboring runtime entry point that also loads configured state backend/storage during checkpoint-related setup [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/Checkpoints.java]
+
+**Tests to inspect or add**
+- Inspect `CheckpointStorageLoaderTest` first; it is the direct regression test for this loader and is the strongest anchor for config-resolution behavior [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/state/CheckpointStorageLoaderTest.java]
+- Also inspect `CheckpointCoordinatorMasterHooksTest` only as adjacent checkpointing coverage, not as the primary loader test [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorMasterHooksTest.java]
+- If adding coverage, add tests around:
+  - explicit storage selection from config
+  - fallback/legacy precedence handling
+  - error behavior for malformed or unloadable storage config
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/state_backends/#part-0001]
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/CheckpointStorageLoader.java]
+- Related runtime class: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/state/storage/FileSystemCheckpointStorage.java]
+- Related runtime class: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/Checkpoints.java]
+- Direct test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/state/CheckpointStorageLoaderTest.java]
+- Neighboring test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorMasterHooksTest.java]
+
+**Uncertainties**
+retrieval returned the loader source and test file anchors, but the method body for `CheckpointStorageLoader` was truncated in the evidence, so I cannot safely claim the exact precedence/order of all configuration branches from this response alone. If you need the precise loading algorithm, the next step is to inspect that source file directly in retrieval system.
+
+ANSWER B:
+**Recommendation**
+- Anchor the explanation on the Flink 2.2.0 release docs for checkpointing and state backends, then verify against `CheckpointStorageLoader`.
+- The loading flow is configuration-first: an explicitly configured checkpoint storage wins; otherwise Flink derives a default storage from checkpoint-related config, typically filesystem-backed when `state.checkpoints.dir` is set, and job-manager-backed when no checkpoint directory is configured.
+- Treat savepoint config as separate from checkpoint storage selection; it influences defaults, but it is not the same decision point.
+
+**Implementation anchors**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/state/CheckpointStorageLoader.java`
+- `flink-runtime/src/main/java/org/apache/flink/runtime/state/CheckpointStorage.java`
+- `flink-runtime/src/main/java/org/apache/flink/runtime/state/storage/FileSystemCheckpointStorage.java`
+- `flink-runtime/src/main/java/org/apache/flink/runtime/state/storage/JobManagerCheckpointStorage.java`
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/state/CheckpointStorageLoaderTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/state/storage/FileSystemCheckpointStorageTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/state/storage/JobManagerCheckpointStorageTest.java`
+- Add or tighten a test that locks down precedence between explicit storage config, `state.checkpoints.dir`, and the no-checkpoint-dir fallback.
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/state/CheckpointStorageLoader.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/state/CheckpointStorageLoaderTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/state/storage/FileSystemCheckpointStorageTest.java`
+
+**Uncertainties**
+- I am not fully certain of the exact Flink 2.2.0 docs URL path from memory.
+- Minor method signatures and exact config precedence details in `CheckpointStorageLoader` may differ slightly across 2.2.x point releases.

@@ -1,0 +1,33 @@
+```json
+{
+  "winner": "A",
+  "confidence": 0.85,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 3
+    }
+  },
+  "rationale": "A correctly identifies `handleRequest` delegates to `createJobPlanInfo(executionGraph)` (confirmed by evidence L60-63). B fabricates `new JobPlanInfo(executionGraph.getPlan())` — no such direct call exists in evidence. A cites the live Flink 2.2 REST docs page with the actual `/jobs/:jobid/plan` contract. B substitutes doc-generator classes as the docs anchor, which is less actionable. A's claims are all supported by provided evidence snippets; B's evidence is a single class-name stub.",
+  "critical_issues": {
+    "A": [
+      "Minor: answer notes uncertainty about handleRequest body, but the evidence (L60-63) actually confirms createJobPlanInfo directly — a missed opportunity to quote the line explicitly."
+    ],
+    "B": [
+      "Fabricated implementation: states handleRequest returns `new JobPlanInfo(executionGraph.getPlan())` but evidence shows it calls the private `createJobPlanInfo(executionGraph)` method.",
+      "Thin evidence: B's sole code evidence snippet contains only the class name with no line content, making all line-level claims unverified.",
+      "Docs anchor is indirect: citing RuntimeRestAPIDocGenerator/RuntimeOpenApiSpecGenerator instead of the live 2.2 REST docs page is less useful for verifying the current API contract."
+    ]
+  }
+}
+```

@@ -1,0 +1,133 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-cancellation-handler
+TITLE: Flink REST pattern for JobCancellationHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobCancellationHandler`: trace cancellation request handling and response behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the explanation on the Flink 2.2.0 REST API docs plus the runtime handler and its direct test. The retrieved evidence is enough to name the correct files, but it does not fully expose every internal branch of `JobCancellationHandler`, so avoid claiming details beyond what the source and test explicitly show.
+
+**Implementation anchors**
+- Version-pinned REST API docs:
+  - `docs/ops/rest_api/index.html` for the REST API versioning and backend/development guidance [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001]
+  - Same doc’s developing section, which states REST handlers live in `flink-runtime` and are wired through `WebMonitorEndpoint` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+  - Same doc’s versioning section, which explains versioned `/vN/...` REST endpoints [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003]
+- Implementation class:
+  - `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandler.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandler.java]
+- Message/route contract behind the handler:
+  - `flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobCancellationHeaders.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobCancellationHeaders.java]
+
+**Tests to inspect or add**
+- Primary neighboring test:
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandlerTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandlerTest.java]
+- Helpful adjacent REST-handler tests:
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java]
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java]
+
+**Citations**
+- REST API docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001]
+- REST backend/development guidance: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- REST API versioning behavior: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0003]
+- Handler implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandler.java]
+- Cancellation handler test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandlerTest.java]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/RestServerEndpointITCase.java]
+
+**Uncertainties**
+- The retrieval system snippets confirm the correct handler/test files and request shape, but they do not expose the full internal control flow of `JobCancellationHandler` or every response branch. If you need a precise branch-by-branch trace, the next step is to inspect the source file itself.
+
+ANSWER B:
+**Recommendation**
+Anchor the explanation on the version-pinned Flink 2.2.0 REST API docs for job cancellation, then verify behavior in `JobCancellationHandler`. The key semantic to call out is that cancellation handling is a request/ack path, not proof that the job is already fully terminated when the HTTP response returns.
+
+**Implementation anchors**
+- Version-pinned Flink 2.2.0 REST API docs, cancellation section for the job endpoint.
+- `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandler.java`
+- Follow the handler down to the dispatcher/job-gateway cancel call and back to the REST response construction.
+- If you need to be precise about the response contract, check whether the handler returns an empty/ack-style body or an async-operation response in this version before stating it definitively.
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandlerTest.java`
+- Neighboring job-handler tests in the same package, especially tests for status/termination-style handlers.
+- Add or extend coverage for:
+  - successful cancellation submission
+  - invalid/missing job-id handling
+  - gateway exception mapping
+  - repeated cancel on already-cancelling/cancelled jobs, if the code treats that specially
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandler.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobCancellationHandlerTest.java`
+- Apache Flink 2.2.0 REST API docs, job-cancellation section
+
+**Uncertainties**
+- I am not fully certain of the exact response body/status contract without checking the source; Flink cancellation handlers sometimes return an acknowledgement rather than a terminal job result.
+- I cannot verify the exact versioned docs URL or every neighboring test class name from memory alone.

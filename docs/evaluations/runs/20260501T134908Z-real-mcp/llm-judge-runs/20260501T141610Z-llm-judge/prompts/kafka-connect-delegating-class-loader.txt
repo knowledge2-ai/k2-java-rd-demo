@@ -1,0 +1,136 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-delegating-class-loader
+TITLE: Kafka Connect pattern for DelegatingClassLoader
+QUESTION:
+For Kafka Connect 4.2.0, inspect `DelegatingClassLoader`: inspect plugin classloader delegation behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs as context, but anchor the actual behavior claim on `DelegatingClassLoader` itself. The class Javadoc says Connect uses a child-first delegation model for plugin classes and parent delegation for non-plugin classes, so that is the canonical implementation source for the answer [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java].
+
+**Implementation anchors**
+- Primary implementation: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java]
+- Nearby supporting code: `ClassLoaderFactory` and `LoaderSwap`, which sit in the same isolation package and frame how plugin classloaders are constructed and swapped [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ClassLoaderFactory.java] [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/LoaderSwap.java]
+- Version-pinned docs to cite for context:
+  - Kafka Connect landing page for 4.2 [https://kafka.apache.org/42/kafka-connect/]
+  - Connector Development Guide 4.2 [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+  - Kafka Connect User Guide 4.2 [https://kafka.apache.org/42/kafka-connect/user-guide/]
+  - Kafka Connect configuration reference 4.2 [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+
+**Tests to inspect or add**
+- Existing focused unit test: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java]
+- Neighboring concurrency/integration coverage: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java]
+- If adding coverage, target:
+  - child-first resolution for plugin classes
+  - parent delegation for non-plugin classes
+  - concurrent loading / parallel-capable behavior
+  - plugin isolation across multiple plugin classloaders
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/]
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/]
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/]
+- Docs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java]
+- Neighboring code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ClassLoaderFactory.java]
+- Neighboring code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/LoaderSwap.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java]
+
+**Uncertainties**
+- The retrieved evidence does not expose a docs page that explicitly documents `DelegatingClassLoader` by name, so the docs above are contextual anchors rather than direct behavioral specs.
+- I did not inspect the full test bodies here, so any finer-grained assertions should be verified directly in `DelegatingClassLoaderTest` and `SynchronizationTest` before relying on them.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on Kafka Connect’s plugin-isolation contract: `DelegatingClassLoader` is the entry point that resolves connector/task/transform classes from plugin classloaders first, while preserving parent-first behavior for Kafka/platform classes. For 4.2.0, frame the behavior around class resolution, plugin discovery, and the fallback path when no plugin loader matches.
+
+**Implementation anchors**
+- `org.apache.kafka.connect.runtime.isolation.DelegatingClassLoader`
+- The adjacent plugin-loading types in the same package, especially the plugin classloader / scan / discovery path used to register plugin loaders.
+- If you need the delegation rules precisely, inspect the `loadClass` / resource lookup path in `DelegatingClassLoader` and the helper methods that select a plugin classloader by class name or package.
+
+**Tests to inspect or add**
+- Existing unit tests in the `connect/runtime/isolation` area, especially any `DelegatingClassLoader*Test` class.
+- Neighboring tests that cover plugin discovery, plugin classloader selection, and parent-vs-plugin precedence.
+- Add/strengthen tests for:
+  - plugin class wins for plugin-owned classes
+  - parent class wins for Kafka/JDK classes
+  - ambiguous class names across plugins
+  - resource lookup behavior if the answer mentions resources, not just classes
+
+**Citations**
+- Apache Kafka 4.2.0 documentation for Kafka Connect plugin/classloading isolation
+- `org.apache.kafka.connect.runtime.isolation.DelegatingClassLoader`
+- `connect/runtime/isolation/*Test` neighboring tests
+
+**Uncertainties**
+- I’m confident about the implementation class and the general test area, but I’m not fully certain of the exact 4.2.0 doc URL or the exact neighboring test class names without checking the source tree.
+- If you want a source-precise answer, the next step is to pin the exact 4.2.0 doc page and the concrete test filenames from the Kafka 4.2.0 branch.

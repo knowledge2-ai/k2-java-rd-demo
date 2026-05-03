@@ -1,0 +1,136 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugin-scan-result
+TITLE: Kafka Connect pattern for PluginScanResult
+QUESTION:
+For Kafka Connect 4.2.0, inspect `PluginScanResult`: inspect plugin scanning results. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Connect isolation classes in Kafka 4.2.0, with `PluginScanResult` as the data structure, `PluginScanner` plus its two concrete scanners as the scan pipeline, and `PluginScannerTest` as the primary behavioral test. There is no separate `docs/` tree in this checkout, so the version-pinned documentation anchors are the source Javadocs tied to KIP-898.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java:35-145`  
+  Core result object: per-plugin-type `SortedSet`s, merge constructor, `forEach`, and `isEmpty`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanner.java:40-90`  
+  Abstract scanner contract and the `discoverPlugins(Set<PluginSource>)` entry point that returns a merged `PluginScanResult`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ReflectionScanner.java:43-69`  
+  Legacy scanning docs: reflective scan rules, versioned KIP-898 note, and the concrete `new PluginScanResult(...)` assembly.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ServiceLoaderScanner.java:32-53`  
+  Modern scanning docs: `ServiceLoader`-only rules and the concrete `new PluginScanResult(...)` assembly.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDiscoveryMode.java:21-52`  
+  Version-pinned KIP-898 mode docs that define which scan path is expected.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java:40-159`  
+  Best direct anchor for scan-result behavior: empty path, valid plugin sets, invalid jars, mixed inputs, versioned vs unversioned plugins, and loader isolation.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java:106-120`  
+  Neighboring consumer test that builds `PluginScanResult` fixtures to exercise discovery modes and config plumbing.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java:105-157`  
+  Neighboring consumer test for how installed scan results drive classloader selection.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java:502-603`  
+  Neighboring consumer test for alias computation over `PluginScanResult`.
+- If adding coverage, a focused `PluginScanResult` unit test would be most useful for merge semantics and `isEmpty()`/`forEach()` behavior, since those are currently exercised indirectly.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java:35-145`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanner.java:40-90`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ReflectionScanner.java:43-69`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ServiceLoaderScanner.java:32-53`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDiscoveryMode.java:21-52`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java:40-159`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java:106-120`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java:105-157`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginUtilsTest.java:502-603`
+
+**Uncertainties**
+- I did not find a separate versioned `docs/` subtree in this checkout, so the strongest “version-pinned docs” available here are the source Javadocs tied to KIP-898.
+- `PluginScanResult` itself has no dedicated test class; its behavior is validated indirectly through the scanner and consumer tests above.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Kafka 4.2 Connect docs for plugin manifests and compatibility, then ground the behavior in the `PluginScanResult` implementation and the scanner test coverage. The best fit from retrieval system is the 4.2 Kafka Connect landing page and Connector Development Guide, plus the user guide section that describes plugin manifests and compatibility rules [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/) [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/) [https://kafka.apache.org/42/kafka-connect/user-guide/](https://kafka.apache.org/42/kafka-connect/user-guide/)
+
+**Implementation anchors**
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java` is the core result holder for scan output; it aggregates sorted sets for sink connectors, source connectors, converters, header converters, transformations, predicates, config providers, REST extensions, and connector client config override policies [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java]
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java` owns the `scanResult` field and initializes it through `initLoaders(...)`, so it is the surrounding entry point for plugin scanning flow [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java` first; it already covers empty directories, invalid JARs only, and no-plugin cases, which are the closest neighboring scanner behaviors [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java]
+- I did not find a dedicated `PluginScanResultTest` in the retrieved evidence, so if you need direct coverage for `PluginScanResult` itself, that test likely needs to be added.
+- If you want stronger regression coverage, add assertions for how each plugin category is populated in the returned `PluginScanResult`, not just that scanning completes or returns empty.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/), [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/), [https://kafka.apache.org/42/kafka-connect/user-guide/](https://kafka.apache.org/42/kafka-connect/user-guide/)
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginScanResult.java), [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java)
+- Neighboring tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java)
+
+**Uncertainties**
+- The retrieved evidence did not surface a dedicated `PluginScanResultTest`, so I cannot claim one exists.
+- The docs surfaced by retrieval system are version-pinned to 4.2, but the evidence here is broad; if you need the exact subsection for manifest compatibility, I would anchor on the user guide and connector development guide rather than the top-level landing page.

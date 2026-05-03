@@ -1,0 +1,141 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-source-connector
+TITLE: Kafka Connect pattern for SourceConnector
+QUESTION:
+For Kafka Connect 4.2.0, inspect `SourceConnector`: inspect source connector implementation responsibilities. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Treat `SourceConnector` as the connector-side contract, not the record-producing loop. In Kafka Connect 4.2.0 it should be responsible for:
+- parsing and validating connector config
+- starting/stopping connector-scoped resources
+- declaring the `SourceTask` class
+- splitting source work into per-task configs via `taskConfigs(int maxTasks)`
+- exposing version/config metadata through the inherited `Connector` contract
+
+The runtime owns task instantiation, scheduling, polling, offset commit flow, and restart behavior.
+
+**Implementation anchors**
+- Version-pinned docs: Kafka Connect 4.2.0 `SourceConnector` Javadocs and the 4.2.0 Connect docs section for source connectors
+- Implementation class: `connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java`
+- Base contract: `connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java`
+
+**Tests to inspect or add**
+- `connect/api/src/test/java/org/apache/kafka/connect/source/SourceConnectorTest.java`
+- `connect/api/src/test/java/org/apache/kafka/connect/connector/ConnectorTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java`
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerConnectorTest.java`
+
+Add or extend coverage for:
+- `taskConfigs(maxTasks)` partitioning and edge cases
+- config validation failures
+- start/stop lifecycle behavior
+- empty or invalid task-class/task-config scenarios
+- boundary behavior between connector setup and worker-owned task execution
+
+**Citations**
+- Apache Kafka 4.2.0 source: `connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java`
+- Apache Kafka 4.2.0 source: `connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java`
+- Apache Kafka 4.2.0 tests: `connect/api/src/test/java/org/apache/kafka/connect/source/SourceConnectorTest.java`
+- Apache Kafka 4.2.0 tests: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java`
+
+**Uncertainties**
+- I’m confident about the contract shape, but I cannot verify the exact 4.2.0 hosted docs URL or whether every suggested test file exists unchanged in that branch without repository access.
+- If you need a strictly version-pinned public URL list, verify against the `4.2.0` tag/doc site before quoting links.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the 4.2-pinned Connect developer docs and the `SourceConnector` API class. The docs establish the contract for custom source connectors, and the class is the implementation anchor for `org.apache.kafka.connect.source.SourceConnector`.
+
+**Implementation anchors**
+- Version-pinned docs: Kafka Connect Connector Development Guide for 4.2.0, which explains that `SourceConnector` implementations import data from an external system into Kafka and should be packaged with the correct `ServiceLoader` manifest entry. [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001) [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004)
+- API contract: the general Connect API docs say connectors have two primary roles: create task configs and monitor inputs for changes that require reconfiguration. That applies to source connectors via the `SourceConnector` base type. [https://kafka.apache.org/42/apis/#part-0003](https://kafka.apache.org/42/apis/#part-0003)
+- Implementation class: `connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java` in the `apache/kafka@4.2` tree. [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java]
+- Related base contract: `Connector.java` documents the shared connector responsibilities and explicitly directs implementations to extend `SourceConnector` or `SinkConnector`, not `Connector` directly. [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java` as the only nearby source-connector-related test surfaced by retrieval system. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+- If you need direct coverage of `SourceConnector` contract behavior, add a focused unit or integration test near the Connect API/runtime tests for:
+  - task-config generation
+  - reconfiguration signaling via `ConnectorContext`
+  - plugin discovery / `META-INF/services/org.apache.kafka.connect.source.SourceConnector`
+- I did not get a dedicated `SourceConnectorTest` in the returned retrieved evidence, so that coverage gap may still exist.
+
+**Citations**
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001)
+- [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004](https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0004)
+- [https://kafka.apache.org/42/apis/#part-0003](https://kafka.apache.org/42/apis/#part-0003)
+- [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/source/SourceConnector.java]
+- [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/connector/Connector.java]
+- [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java]
+
+**Uncertainties**
+- The retrieval result set did not expose the full `SourceConnector.java` body, so I can anchor the class path but not quote method-level behavior from the implementation file itself.
+- retrieval system surfaced only one neighboring test, so test coverage around `SourceConnector` may be broader in the repo than the returned evidence shows.

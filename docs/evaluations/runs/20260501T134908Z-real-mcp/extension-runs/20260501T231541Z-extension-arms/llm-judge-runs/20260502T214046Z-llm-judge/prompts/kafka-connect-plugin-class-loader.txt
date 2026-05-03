@@ -1,0 +1,144 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugin-class-loader
+TITLE: Kafka Connect pattern for PluginClassLoader
+QUESTION:
+For Kafka Connect 4.2.0, inspect `PluginClassLoader`: inspect isolated plugin class loading. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+- Use the version-pinned Kafka 4.2 docs as the behavior contract for Connect plugin isolation and packaging: the Connect user guide, the connector development guide, and the 4.2 config reference for plugin version settings. They frame the expected manifest-based plugin visibility and isolation model. [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040] [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001] [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- Treat `PluginClassLoader` as the primary implementation anchor for isolated plugin loading. The retrieved evidence shows it is a child-first loader that loads from its own URLs first, delegates to parent when a class is missing or not meant for isolation, and is registered as parallel capable. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java]
+
+**Implementation anchors**
+- Primary: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java` for the `loadClass` path and isolation rules. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java]
+- Adjacent context: `DelegatingClassLoader.java` for how plugin classloaders are resolved, and `ClassLoaderFactory.java` for creation/wiring. [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java] [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ClassLoaderFactory.java]
+
+**Tests to inspect or add**
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java` for versioned plugin loading and isolated plugin loading across discovery modes. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+- Inspect `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java` for concurrent classloading and deadlock-sensitive behavior around delegating loaders. [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java]
+- If you need a new regression, add one that proves `PluginClassLoader` prefers the plugin-local class over the parent for isolation, and falls back to parent only when the class is absent or non-isolated. That specific test was not surfaced by retrieval system, so it is a suggested gap rather than an existing anchor.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040]
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Docs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java]
+- Neighboring code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java]
+- Neighboring code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/ClassLoaderFactory.java]
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java]
+- Tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java]
+
+**Uncertainties**
+- retrieval did not return a dedicated `PluginClassLoaderTest`; the neighboring tests surfaced are `MultiVersionTest` and `SynchronizationTest`.
+- The exact line-level semantics inside `PluginClassLoader.loadClass` are only partially visible in the returned snippet, so I am limiting implementation claims to what retrieval system explicitly surfaced.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the `PluginClassLoader` source itself, plus the loader-selection path in `PluginUtils` / `DelegatingClassLoader`.
+- I could not verify a separate versioned docs page in this checkout, so the local doc anchor is the class Javadoc in source rather than a standalone `docs/` file.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java#L31-L40` for the class-level contract: dedicated isolated plugin loading, child-first behavior, parallel-capable.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java#L45-L47` for `ClassLoader.registerAsParallelCapable()`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java#L73-L133` for the child-first `getResource` / `getResources` / `loadClass` implementation.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L160-L169` for the isolation predicate (`shouldLoadInIsolation`).
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L359-L382` for creation of isolated plugin sources and `PluginClassLoader`.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java#L36-L46` and `#L75-L96` for the delegating loader that routes plugin classes to isolated loaders.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java#L222-L358` for the parallel-capable / deadlock-avoidance invariants.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java#L135-L255` for loader lookup, version-range handling, and fallback behavior.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java#L143-L153` for “classpath plugin is also loaded in isolation”.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java#L323-L447` for end-to-end plugin instantiation/configuration through `PluginClassLoader`.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java#L611-L670` for mixed parent/plugin-path resource/version behavior and classloader assertions.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L52-L60` and `#L310-L325` for `PluginClassLoader` location metadata and null-location rejection.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L51-L67` and `#L145-L193` for versioned plugin selection using isolated loaders.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java#L31-L40`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java#L45-L47`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginClassLoader.java#L73-L133`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L160-L169`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java#L359-L382`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java#L36-L46`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoader.java#L75-L96`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/SynchronizationTest.java#L222-L358`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java#L135-L255`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginScannerTest.java#L143-L153`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java#L323-L447`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginsTest.java#L611-L670`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L52-L60`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L310-L325`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L51-L67`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L145-L193`
+
+**Uncertainties**
+- I did not find a separate version-pinned `docs/` tree in this checkout, so I could not cite a standalone Kafka 4.2.0 user doc page for plugin isolation.
+- If you want a user-facing docs citation rather than source/Javadoc anchors, that would need a different repository snapshot that includes the generated docs.

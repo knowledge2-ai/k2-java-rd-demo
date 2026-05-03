@@ -1,0 +1,32 @@
+{
+  "winner": "B",
+  "confidence": 0.93,
+  "scores": {
+    "A": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    }
+  },
+  "rationale": "B matches the Flink 2.2 API surface better: `DefaultCompletedCheckpointStore` is the main retention implementation, and the cited docs/API page explicitly describe bounded retention and recovery behavior. A is weaker because it treats `StandaloneCompletedCheckpointStore` as the likely primary implementation and misses the key 2.2 anchor, `DefaultCompletedCheckpointStore` plus its tests.",
+  "critical_issues": {
+    "A": [
+      "Misses the key 2.2 implementation class: `DefaultCompletedCheckpointStore`.",
+      "Treats `StandaloneCompletedCheckpointStore` as the likely primary store without support.",
+      "Lists `StandaloneCompletedCheckpointStoreTest` without evidence and omits `DefaultCompletedCheckpointStoreTest`."
+    ],
+    "B": [
+      "Uses a somewhat odd docs citation format (`#part-0001`), so the exact doc anchoring is weaker than the code anchors.",
+      "Mentions `FileSystemCheckpointStorage`, which is related context but not the core `CompletedCheckpointStore` retention anchor."
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.87,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A better matches the ask: it gives version-pinned 4.2 docs, the exact `ConnectorPluginsResource` implementation, and the neighboring test class that exercises `validateConfigs(...)`. B is more tentative and omits the concrete 4.2 docs anchor, so it is less useful for an engineer tracing the validation path.",
+  "critical_issues": {
+    "A": [
+      "The docs anchors are broad administration/overview pages, not a clearly validation-specific 4.2 REST doc section.",
+      "It relies on retrieval-system claims without showing the exact method path through `ConnectorPluginsResource`."
+    ],
+    "B": [
+      "No version-pinned public docs URL or anchor is provided, which is a direct miss for the question.",
+      "The cited neighboring test `ConnectorsResourceTest` is less relevant than `ConnectorPluginsResourceTest` for this validation flow.",
+      "The `PUT /connector-plugins/{connectorType}/config/validate` route is asserted without source-backed evidence in the answer."
+    ]
+  }
+}

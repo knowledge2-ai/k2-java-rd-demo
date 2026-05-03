@@ -1,0 +1,148 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-plugin-desc
+TITLE: Kafka Connect pattern for PluginDesc
+QUESTION:
+For Kafka Connect 4.2.0, inspect `PluginDesc`: inspect plugin descriptor metadata. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Kafka 4.2 docs for Connect, then tie the behavior to the `PluginDesc` implementation and its direct unit test coverage. The most relevant version-pinned docs are the 4.2 Kafka Connect landing page, the Connector Development Guide, the Connect user guide, and the Connect config reference for plugin-versioned settings [https://kafka.apache.org/42/kafka-connect/] [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001] [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040] [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040].
+
+**Implementation anchors**
+- `PluginDesc` implementation: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java]
+- The class exposes descriptor metadata through `className()`, `version()`, `type()`, `typeName()`, `location()`, and `loader()`, and its equality/hash behavior is based on plugin class, version, and type [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java].
+- Neighboring production code that consumes the descriptor:
+  - `PluginUtils.simpleName(PluginDesc<?>)` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java]
+  - `Plugins` uses `PluginDesc` for plugin lookup and alias matching [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java]
+  - `ConnectorConfig` references plugin version validation for connector configs [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+
+**Tests to inspect or add**
+- Existing direct unit test: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java]
+- This is the primary neighboring test to inspect for metadata semantics, equality, and version-related behavior.
+- If you are adding coverage, the most useful additions would be around:
+  - JSON/property exposure for `class`, `version`, `type`, and `location`
+  - equality/hashCode stability across same class/version/type
+  - versioned plugin descriptor behavior when versions differ
+- I did not get evidence of additional adjacent `PluginDesc`-specific tests beyond `PluginDescTest`; retrieval system did surface broader Connect integration tests, but they are not as directly anchored to `PluginDesc` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ExactlyOnceSourceIntegrationTest.java].
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/]
+- Docs: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/#part-0001]
+- Docs: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040]
+- Docs: [https://kafka.apache.org/42/configuration/kafka-connect-configs/#part-0040]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java]
+- Neighboring code: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginUtils.java], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/Plugins.java], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java]
+- Test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java]
+
+**Uncertainties**
+- retrieved evidence confirms the direct implementation and `PluginDescTest`, but it does not expose the full body of `PluginDescTest`, so I can’t claim exact assertions beyond the visible metadata-related coverage.
+- The docs are version-pinned to Kafka 4.2, but they are general Connect docs rather than `PluginDesc`-specific references.
+
+ANSWER B:
+**Recommendation**
+- Treat `PluginDesc` as the source of truth for Connect plugin descriptor metadata. It is where the descriptor shape is defined and serialized: plugin class, version, type, location, `UNDEFINED_VERSION`, and the ordering/equality rules.
+- For version-pinned docs, anchor on the inline config docs that expose `*.plugin.version` settings, not on a separate markdown page. The clearest docs are the converter/header-converter version configs in `WorkerConfig` and the connector version config in `ConnectorConfig`.
+- If this answer needs to cover REST output, also anchor on `PluginInfo`, which maps `PluginDesc` into the `/connector-plugins` response and filters out `undefined` versions.
+
+**Implementation anchors**
+- `PluginDesc` implementation: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java#L26-L133`
+- Version-pinned worker docs:
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L72-L107`
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L214-L259`
+- Version-pinned connector docs:
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L92-L135`
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L240-L251`
+- REST metadata bridge:
+  - `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfo.java#L19-L42`
+
+**Tests to inspect or add**
+- Core unit coverage for `PluginDesc` behavior:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L43-L345`
+  - Especially `testRegularPluginDesc`, `testPluginDescWithSystemClassLoader`, `testPluginDescWithNullVersion`, `testPluginDescEquality`, `testPluginDescComparison`, and `testNullArguments`.
+- REST serialization/version filtering:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfoTest.java#L32-L74`
+- End-to-end plugin listing and version propagation:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L360-L417`
+- Versioned loader and selection behavior, if the change touches ordering or version resolution:
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java#L98-L180`
+  - `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L144-L240`
+
+**Citations**
+- `PluginDesc` metadata fields, Jackson annotations, compare/equality: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/isolation/PluginDesc.java#L26-L133`
+- Version config docs and `*.plugin.version` keys: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L72-L107`, `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L92-L135`
+- Config registration that wires those docs into the schema: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerConfig.java#L214-L259`, `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/ConnectorConfig.java#L240-L251`
+- REST entity that carries plugin metadata and suppresses `undefined`: `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfo.java#L19-L42`
+- Dedicated `PluginDesc` unit test: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/PluginDescTest.java#L43-L345`
+- JSON/version regression tests: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/entities/PluginInfoTest.java#L32-L74`, `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java#L360-L417`
+- Version-selection neighbors: `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/DelegatingClassLoaderTest.java#L98-L180`, `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/isolation/MultiVersionTest.java#L144-L240`
+
+**Uncertainties**
+- I did not find a separate markdown docs page in this checkout; the authoritative version-pinned docs are the inline `ConfigDef` doc strings in `WorkerConfig` and `ConnectorConfig`.
+- If you meant a different “docs” surface, such as generated API docs or website content outside this checkout, I could not verify that locally.

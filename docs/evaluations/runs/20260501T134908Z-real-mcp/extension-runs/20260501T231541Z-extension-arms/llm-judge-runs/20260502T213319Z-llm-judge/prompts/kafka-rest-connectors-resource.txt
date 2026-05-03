@@ -1,0 +1,125 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-rest-connectors-resource
+TITLE: Kafka Connect pattern for ConnectorsResource
+QUESTION:
+For Kafka Connect REST 4.2.0, inspect `ConnectorsResource`: trace connector CRUD REST behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the CRUD answer on the public resource implementation in `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java` and its dedicated test suite in `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java`. I did not find a separate checked-in Connect REST AsciiDoc/Markdown page in this source drop, so the source Javadocs/OpenAPI annotations are the best versioned-doc anchor here.
+
+**Implementation anchors**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java:74` is the class-level REST root for `/connectors`.
+- The CRUD path is implemented in `listConnectors`, `createConnector`, `getConnector`, `getConnectorConfig`, `putConnectorConfig`, `patchConnectorConfig`, and `destroyConnector` in the same class.
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java:49` registers `ConnectorsResource` as part of the regular REST resource set.
+- For docs-style anchors, use `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/rest/package-info.java:17` plus the client helper Javadocs in `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/clusters/EmbeddedConnect.java:265` for `POST /connectors`, and the adjacent helper methods for `PUT`, `PATCH`, and `DELETE`.
+
+**Tests to inspect or add**
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java:192` covers listing and expand behavior; `:290` covers create; `:429` covers delete; `:517` and `:600` cover `PUT` and `PATCH`; `:649` covers restart; `:848` covers offsets.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java:193` and `:249` verify `/connectors` is wired through the server and responds correctly.
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/RestForwardingIntegrationTest.java:210` covers forwarded `POST /connectors` end-to-end.
+- If you need a regression test for a change in response codes or forwarding, add it next to the existing CRUD methods in `ConnectorsResourceTest` rather than creating a new test class.
+
+**Citations**
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java:74`
+- `repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java:49`
+- `repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/rest/package-info.java:17`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java:192`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/ConnectRestServerTest.java:193`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/RestForwardingIntegrationTest.java:210`
+- `repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/util/clusters/EmbeddedConnect.java:265`
+
+**Uncertainties**
+- I did not find a standalone versioned Connect REST docs page in this checkout.
+- The strongest docs anchor available locally is source Javadoc/OpenAPI annotations, not a release-note or AsciiDoc page.
+
+ANSWER B:
+**Recommendation**
+Anchor your 4.2.0 analysis on the versioned Kafka Connect admin docs plus the `ConnectorsResource` implementation and its dedicated test class. The retrieved evidence is enough to identify the right files, but it is truncated before the full method-level CRUD trace, so don’t infer endpoint details beyond what is explicitly verified here.
+
+**Implementation anchors**
+- Version-pinned docs: Kafka 4.2 Connect Administration, which describes the REST layer used to view and alter connector state [https://kafka.apache.org/42/kafka-connect/administration/#part-0001].
+- Primary implementation: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java].
+- Broader REST context: `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java` and `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResource.java` [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/ConnectRestServer.java], [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResource.java].
+
+**Tests to inspect or add**
+- Primary neighboring test: `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java].
+- Adjacent REST tests worth checking for shared wiring and regressions: `InternalConnectResourceTest`, `ConnectorPluginsResourceTest`, `RootResourceTest`, `LoggingResourceTest` [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java].
+- If you are adding coverage, add or extend `ConnectorsResourceTest` around the CRUD paths directly; the returned evidence confirms that class is the dedicated anchor, but not the full method inventory.
+
+**Citations**
+- Docs: [https://kafka.apache.org/42/kafka-connect/administration/#part-0001]
+- Implementation: [repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java]
+- Primary test: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java]
+- Related tests: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/InternalConnectResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/RootResourceTest.java], [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/LoggingResourceTest.java]
+
+**Uncertainties**
+- The retrieval system payload for `ConnectorsResourceTest` is truncated, so I cannot safely name the exact CRUD methods, REST verbs, or assertions without guessing.
+- The evidence confirms the correct anchor files, but not a complete method-by-method CRUD trace.

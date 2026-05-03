@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.79,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 3
+    }
+  },
+  "rationale": "A better matches SinkConnector’s actual contract: connector-level metadata, task factory/config generation, and sink-runtime neighbors like SinkTask/WorkerSinkTask. B is more URL-grounded, but its test anchor is clearly off-target (ExactlyOnceSourceIntegrationTest) and it leans on a generic Connector framing instead of the sink-specific API surface.",
+  "critical_issues": {
+    "A": [
+      "Test anchors are plausible but not verified as exact neighboring Kafka 4.2.0 sink tests.",
+      "It omits direct versioned doc URLs, so grounding is weaker than B."
+    ],
+    "B": [
+      "Cites an unrelated source integration test as the neighboring test anchor.",
+      "Overstates the usefulness of generic Connector guidance instead of anchoring SinkConnector-specific responsibilities and tests."
+    ]
+  }
+}

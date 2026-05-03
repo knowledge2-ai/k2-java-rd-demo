@@ -1,0 +1,30 @@
+{
+  "winner": "A",
+  "confidence": 0.88,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 2
+    }
+  },
+  "rationale": "A is better anchored to the version-pinned 2.2.0 docs, names the exact implementation class and message header class, and points to the dedicated handler test plus adjacent REST tests. B is much vaguer, weak on 2.2.0 specificity, and explicitly admits uncertainty about the docs path and neighboring tests.",
+  "critical_issues": {
+    "A": [],
+    "B": [
+      "Does not pin the answer to Flink 2.2.0; says 2.2.x and omits the exact docs URL/path.",
+      "Cites only broad package-level anchors for message/parameter types instead of concrete classes.",
+      "Includes speculative neighboring tests and adds uncertainty instead of grounding them in source artifacts.",
+      "Less useful for implementation work because it lacks the exact docs section and precise REST endpoint contract."
+    ]
+  }
+}

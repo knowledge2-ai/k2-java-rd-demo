@@ -1,0 +1,141 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-completed-checkpoint
+TITLE: Flink checkpointing pattern for CompletedCheckpoint
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CompletedCheckpoint`: explain completed checkpoint metadata and lifecycle. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the explanation on the version-pinned 2.2.0 checkpoint docs plus `CompletedCheckpoint` itself. The docs establish the user-facing semantics of checkpoints, while the implementation shows that a completed checkpoint is primarily metadata plus handles/pointers to state, persisted externally and retained in JobManager memory [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001], [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java].
+
+**Implementation anchors**
+- `CompletedCheckpoint` is the core implementation class to inspect for metadata shape, external persistence, and lifecycle hooks [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java].
+- The class docs explicitly note:
+  - completed checkpoint objects are usually small because state handles are pointers,
+  - some backends may embed payload directly in metadata,
+  - the checkpoint metadata is persisted in external storage via an external pointer,
+  - retained completed checkpoints consume JobManager heap [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java].
+- For lifecycle behavior around storage and retention, `DefaultCompletedCheckpointStore` is the adjacent runtime class to inspect; it manages adding checkpoints and subsuming/removing old ones [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java].
+
+**Tests to inspect or add**
+- `CompletedCheckpointTest` for:
+  - restoring/registering shared states after recovery,
+  - cleanup behavior when a checkpoint is subsumed [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointTest.java].
+- `DefaultCompletedCheckpointStoreTest` for:
+  - retention/subsumption ordering,
+  - recovery of sorted completed checkpoints from the state handle store [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java].
+- If adding coverage, focus on one test for metadata persistence/restore and one for old-checkpoint cleanup on subsume.
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java]
+- Tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java]
+
+**Uncertainties**
+The retrieved evidence is enough to anchor the answer, but not enough to give a full field-by-field lifecycle walkthrough of `CompletedCheckpoint` without guessing. In particular, the exact constructor fields, serialization format, and every transition method were not fully surfaced in the evidence, so those details should be verified directly in `CompletedCheckpoint.java` before making stronger claims.
+
+ANSWER B:
+**Recommendation**
+Anchor the explanation on `CompletedCheckpoint` itself: in Flink 2.2.0 it is the runtime object that holds a finished checkpoint’s metadata, and its lifecycle is “created after all tasks acknowledge, registered back into shared state on restore, retained in a bounded store, then discarded on subsume or shutdown according to `CheckpointProperties`.” The cleanest local doc anchor is the Javadoc on `CompletedCheckpoint.java`; I did not find a separate rendered checkpointing guide source in this checkout.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L57-L78` for the class-level metadata contract and external-pointer persistence note.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L88-L187` for the actual metadata fields and constructor copying behavior.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L248-L259` for shared-state re-registration after restore.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L267-L292` for subsume/shutdown discard policy hooks.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L333-L407` for the discard lifecycle, including metadata handle, operator state, and storage-location cleanup.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStore.java#L32-L124` for the store contract: bounded LIFO retention, add/subsume, shutdown, and externalized-checkpoint requirement.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java#L42-L220` for the concrete recovery/retention/shutdown path.
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointTest.java#L48-L391` for metadata comparison, shared-state registration, subsume cleanup, shutdown cleanup, and stats callback behavior.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStoreTest.java#L44-L260` for the store contract, overflow subsumption, latest checkpoint lookup, and shutdown semantics.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java#L61-L220` for the external store/recovery path, ordered recovery, and add/remove failure handling.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStoreTest.java#L38-L123` for terminal-state and suspended shutdown behavior in standalone mode.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointsCleanerTest.java#L32-L69` for the cleaner’s low-watermark behavior.
+- If adding coverage, a focused test for `CompletedCheckpointDiscardObject.discardAsync(...)` would close the one lifecycle branch I did not see directly exercised in the existing tests.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L57-L78`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L88-L187`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L248-L259`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L267-L292`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpoint.java#L333-L407`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStore.java#L32-L124`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStore.java#L42-L220`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointTest.java#L48-L391`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CompletedCheckpointStoreTest.java#L44-L260`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCompletedCheckpointStoreTest.java#L61-L220`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/StandaloneCompletedCheckpointStoreTest.java#L38-L123`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointsCleanerTest.java#L32-L69`
+
+**Uncertainties**
+- I could not verify a separate versioned checkpointing markdown/adoc page in this checkout; the reliable local docs anchor is the `CompletedCheckpoint` Javadoc and neighboring store Javadocs.
+- The existing tests strongly cover sync discard and store behavior, but I did not see a direct test for the async discard path on `CompletedCheckpointDiscardObject`.

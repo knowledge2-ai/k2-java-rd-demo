@@ -1,0 +1,166 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-vertex-details-handler
+TITLE: Flink REST pattern for JobVertexDetailsHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobVertexDetailsHandler`: inspect a vertex-scoped REST endpoint implementation. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the Flink 2.2.0 REST API docs as the contract anchor, then read the handler implementation in `flink-runtime`, and finally inspect nearby job REST tests. retrieval system did not surface a dedicated `JobVertexDetailsHandlerTest`, so treat the answer as anchored by the docs + production handler + adjacent tests rather than a direct vertex-handler test.
+
+**Implementation anchors**
+- Version-pinned REST docs for the vertex endpoint:
+  - `/jobs/:jobid/vertices/:vertexid` GET, which returns task details and subtask summaries [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0035]
+  - The response schema for `JobVertexDetailsInfo` / `JobVertexDetails`-style payload shape [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0036]
+  - The general REST API development guidance that the backend lives in `flink-runtime` and handlers are wired through `WebMonitorEndpoint` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- Implementation class:
+  - `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexDetailsHandler.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexDetailsHandler.java]
+  - The related headers contract is `JobVertexDetailsHeaders` [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobVertexDetailsHeaders.java]
+
+**Tests to inspect or add**
+- Inspect nearby `flink-runtime` job REST tests:
+  - `JobDetailsHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java]
+  - `JobConfigHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java]
+- Inspect adjacent REST utility/versioning coverage:
+  - `HandlerRequestUtilsTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/util/HandlerRequestUtilsTest.java]
+  - `RuntimeRestAPIVersionTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersionTest.java]
+- Add a focused `JobVertexDetailsHandlerTest` if one does not already exist in the tree, covering:
+  - path parameter binding for `jobid` / `vertexid`
+  - response shape for `JobVertexDetailsInfo`
+  - behavior with multiple concurrent attempts and empty/invalid vertex cases
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0035]
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0036]
+- Code: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexDetailsHandler.java]
+- Code: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobVertexDetailsHeaders.java]
+- Tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java]
+- Tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java]
+
+**Uncertainties**
+- retrieval did not return a direct `JobVertexDetailsHandlerTest`, so I cannot claim one exists without guessing.
+- I did not get the full handler body, so any deeper behavioral claims should be verified against the file itself before using them in a patch or review.
+
+ANSWER B:
+**Recommendation**
+- Anchor the answer on the v1 runtime REST docs pipeline, because Flink 2.2.0 treats `RuntimeRestAPIVersion.V1` as the default/stable REST API version.
+- Use `JobVertexDetailsHandler` as the implementation anchor, wired by `JobVertexDetailsHeaders` into `WebMonitorEndpoint`.
+- For tests, lean on the response marshalling test plus the nearest sibling job/subtask handler tests. There is no dedicated `JobVertexDetailsHandlerTest` in this checkout, so that is the most obvious gap if you want direct request-level coverage.
+
+**Implementation anchors**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexDetailsHandler.java:55-153`
+  - Vertex-scoped request handler, path lookup by `JobID` + `JobVertexID`, and the subtask-summary assembly logic.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobVertexDetailsHeaders.java:26-73`
+  - The REST contract: `GET /jobs/:jobid/vertices/:vertexid`, response type, and description.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java:658-666`
+  - Handler registration in the runtime endpoint.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java:30-34`
+  - Confirms `V1` is the stable/default runtime REST API version.
+- Docs pipeline:
+  - `repo://apache/flink@release-2.2.0/flink-docs/README.md:24-36`
+  - `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java:62-83`
+  - `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java:37-60`
+
+**Tests to inspect or add**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/JobVertexDetailsInfoTest.java:36-127`
+  - Best existing coverage for the response body marshalling shape.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java:57-118`
+  - Same handler family; useful pattern for request setup and execution-graph-backed assertions.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java:57-197`
+  - Direct sibling in the vertex/subtask path.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskExecutionAttemptDetailsHandlerTest.java:60-203`
+  - Another close sibling; especially relevant because `JobVertexDetailsHandler` nests subtask attempt details.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexBackPressureHandlerTest.java:58-120`
+  - Nearby vertex-scoped handler test, useful as a style/reference point.
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandlerTest.java:62-120`
+  - Another vertex-scoped sibling.
+- Add if needed:
+  - A dedicated `JobVertexDetailsHandlerTest` modeled after the subtask handler tests, because none exists in the current tree.
+
+**Citations**
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexDetailsHandler.java:55-153`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobVertexDetailsHeaders.java:26-73`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/webmonitor/WebMonitorEndpoint.java:658-666`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/versioning/RuntimeRestAPIVersion.java:30-34`
+- `repo://apache/flink@release-2.2.0/flink-docs/README.md:24-36`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeRestAPIDocGenerator.java:62-83`
+- `repo://apache/flink@release-2.2.0/flink-docs/src/main/java/org/apache/flink/docs/rest/RuntimeOpenApiSpecGenerator.java:37-60`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/messages/JobVertexDetailsInfoTest.java:36-127`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobDetailsHandlerTest.java:57-118`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskCurrentAttemptDetailsHandlerTest.java:57-197`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/SubtaskExecutionAttemptDetailsHandlerTest.java:60-203`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexBackPressureHandlerTest.java:58-120`
+- `repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandlerTest.java:62-120`
+
+**Uncertainties**
+- I did not find a checked-in `JobVertexDetailsHandlerTest` in this 2.2.0 tree.
+- I also did not find an endpoint-specific markdown page in the checkout; the docs are generated into the REST API docs pipeline rather than hand-edited source pages here.

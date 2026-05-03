@@ -1,0 +1,135 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-checkpointing-checkpoint-stats-snapshot
+TITLE: Flink checkpointing pattern for CheckpointStatsSnapshot
+QUESTION:
+For Flink checkpointing 2.2.0, inspect `CheckpointStatsSnapshot`: inspect checkpoint statistics snapshot behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "FsStateBackend",
+    "MemoryStateBackend",
+    "disable checkpointing during upgrade"
+  ],
+  "required_api_surfaces": [
+    "checkpointing"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the behavior discussion on the 2.2.0 checkpointing docs, then verify against `CheckpointStatsSnapshot` itself. Treat it as the immutable, point-in-time aggregate over checkpoint counters, summaries, history, and “latest” checkpoint state.
+
+**Implementation anchors**
+- Version-pinned docs: the Flink 2.2.x checkpointing / fault-tolerance docs, especially the sections on checkpoint statistics, checkpoint history, and the Web UI / REST checkpoint views.
+- Core implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java`
+- Closely related production types to read alongside it:
+  - `CheckpointStatsTracker`
+  - `CheckpointStatsCounts`
+  - `CheckpointStatsSummary`
+  - `CheckpointStatsHistory`
+  - `CompletedCheckpointStats`
+  - `FailedCheckpointStats`
+  - `PendingCheckpointStats`
+  - `RestoredCheckpointStats`
+
+**Tests to inspect or add**
+- Neighboring tests in `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/`:
+  - `CheckpointStatsTrackerTest`
+  - `CheckpointStatsHistoryTest`
+  - Any existing `CheckpointStatsSnapshot*Test` if present in 2.2.0
+- Add or extend tests for:
+  - snapshot immutability
+  - counts/history consistency across updates
+  - propagation of latest completed / failed / restored checkpoints
+  - behavior when new checkpoints arrive after a snapshot is taken
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsTrackerTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsHistoryTest.java`
+
+**Uncertainties**
+- I can name the code anchors confidently, but I cannot verify the exact 2.2.0 docs URL or whether a dedicated `CheckpointStatsSnapshot` test file exists without browsing.
+
+ANSWER B:
+**Recommendation**
+Anchor the answer on the Flink 2.2.0 checkpointing docs and the runtime snapshot/test pair for `CheckpointStatsSnapshot`. The strongest version-pinned docs are the 2.2.0 checkpointing guides, and the implementation anchor is the snapshot class itself in `flink-runtime` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001] [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001] [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java].
+
+**Implementation anchors**
+- `CheckpointStatsSnapshot` is the direct code anchor; retrieval system identifies it as the `org.apache.flink.runtime.checkpoint` class to inspect for snapshot behavior, and it is the release-2.2.0 implementation source [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java].
+- The version-pinned docs to cite are:
+  - Checkpoints guide for 2.2.0 [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+  - Checkpointing guide for 2.2.0 [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- retrieved evidence did not expose method-level internals of `CheckpointStatsSnapshot`, only the class location and type metadata, so I am not inferring deeper behavior beyond the snapshot being the core checkpoint-stats implementation anchor [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java].
+
+**Tests to inspect or add**
+- `CheckpointStatsSnapshotTest` is the direct neighboring regression test to inspect first [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshotTest.java].
+- `DefaultCheckpointStatsTrackerTest` is the next best adjacent test because retrieval system surfaced `testCreateSnapshot`, which suggests snapshot creation behavior is exercised there too [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java].
+- If you need broader checkpoint-coordinator coverage, `CheckpointCoordinatorMasterHooksTest` is nearby but less directly tied to `CheckpointStatsSnapshot` itself [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointCoordinatorMasterHooksTest.java].
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/state/checkpoints/#part-0001]
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/datastream/fault-tolerance/checkpointing/#part-0001]
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshot.java]
+- Test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/CheckpointStatsSnapshotTest.java]
+- Adjacent test: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/checkpoint/DefaultCheckpointStatsTrackerTest.java]
+
+**Uncertainties**
+- retrieval did not return the actual methods/fields inside `CheckpointStatsSnapshot`, so any behavioral detail beyond “this is the snapshot class for checkpoint stats” would be guesswork.
+- The evidence set is enough to anchor docs, implementation, and tests, but not enough to state which exact snapshot invariants are covered without opening the source directly.

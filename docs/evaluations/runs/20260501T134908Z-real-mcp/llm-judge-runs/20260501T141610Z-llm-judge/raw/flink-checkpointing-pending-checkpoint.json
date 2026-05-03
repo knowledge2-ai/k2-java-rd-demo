@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.84,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 3,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 4,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 4
+    }
+  },
+  "rationale": "A better matches the question’s intent: it explains the pending-to-completed/abort lifecycle and anchors it with both `PendingCheckpointTest` and the neighboring `CheckpointCoordinatorTest`. B is more version-tagged, but it is narrower, less useful for an engineer, and its `#part-0001` anchors add little. Neither answer is deeply source-backed, but A is the more complete engineering guide.",
+  "critical_issues": {
+    "A": [
+      "Does not pin the source/test artifacts to an explicit release tag or commit URI, so the grounding is weaker than it could be.",
+      "Says \"if the 2.2.0 code uses slightly different internal terminology\" without pointing to concrete methods or branches."
+    ],
+    "B": [
+      "Omits the neighboring `CheckpointCoordinatorTest`, so it under-anchors the broader checkpoint lifecycle.",
+      "Relies on `#part-0001` URL fragments that are not meaningful technical anchors for the claim.",
+      "Overstates certainty about the returned evidence while giving fewer concrete inspection points for state-transition behavior."
+    ]
+  }
+}

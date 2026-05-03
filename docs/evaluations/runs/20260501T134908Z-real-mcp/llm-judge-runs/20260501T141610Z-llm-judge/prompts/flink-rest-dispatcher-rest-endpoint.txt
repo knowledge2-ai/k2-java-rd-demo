@@ -1,0 +1,127 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-dispatcher-rest-endpoint
+TITLE: Flink REST pattern for DispatcherRestEndpoint
+QUESTION:
+For Flink REST API 2.2.0, inspect `DispatcherRestEndpoint`: identify where dispatcher REST handlers are registered. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Anchor the answer on the Flink 2.2.0 REST API docs and the `DispatcherRestEndpoint` implementation. The retrieved evidence shows dispatcher REST is part of `flink-runtime`, and the docs say new REST handlers are registered via `WebMonitorEndpoint#initializeHandlers()` rather than being added ad hoc elsewhere. [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002] [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/dispatcher/DispatcherRestEndpoint.java]
+
+**Implementation anchors**
+- Version-pinned docs: `flink/flink-docs-release-2.2/docs/ops/rest_api/index.html` for the 2.2.0 REST API contract and handler registration guidance. [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001]
+- Implementation class: `flink-runtime/src/main/java/org/apache/flink/runtime/dispatcher/DispatcherRestEndpoint.java`, which retrieval system identifies as `DispatcherRestEndpoint extends WebMonitorEndpoint<DispatcherGateway>`. [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/dispatcher/DispatcherRestEndpoint.java]
+- Registration point to inspect: `WebMonitorEndpoint#initializeHandlers()` per the REST docs, because that is where new request handlers are added in the runtime REST backend. [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+
+**Tests to inspect or add**
+- No direct `DispatcherRestEndpointTest` surfaced in the retrieved evidence.
+- Neighboring tests that show the same REST-handler registration/testing pattern:
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointHandlersTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointHandlersTest.java]
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java]
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java]
+  - `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerLogListHandlerTest.java` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerLogListHandlerTest.java]
+- If you add coverage, make it verify the dispatcher endpoint registers the expected handlers through the endpoint initialization path, not just individual handler logic.
+
+**Citations**
+- Docs: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0001], [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- Implementation: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/dispatcher/DispatcherRestEndpoint.java]
+- Neighboring tests: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointHandlersTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobConfigHandlerTest.java], [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/cluster/JobManagerLogListHandlerTest.java]
+
+**Uncertainties**
+- The retrieved evidence did not include the exact `DispatcherRestEndpoint` method body, so I cannot name the concrete handler classes it registers without guessing.
+- retrieval system surfaced SQL Gateway REST docs as well, but that is a different REST surface and should not be treated as the primary anchor for `DispatcherRestEndpoint`.
+
+ANSWER B:
+**Recommendation**
+- Treat `DispatcherRestEndpoint` itself as the registration point. In Flink 2.2.0, the dispatcher REST handlers are assembled in the endpoint’s handler-initialization hook and then handed to the `RestServerEndpoint` lifecycle for registration during startup.
+- Practically, that means you should anchor on the endpoint override that builds the handler collection, not on the individual handler implementations.
+
+**Implementation anchors**
+- `DispatcherRestEndpoint` as the implementation class.
+- The endpoint’s handler-registration override, likely `initializeHandlers(...)` or the equivalent startup hook in that 2.2.0 branch.
+- The surrounding REST server wiring in `RestServerEndpoint`, because that is what actually installs the returned handler set.
+- Version-pinned docs anchor: the Flink 2.2 REST API docs page for dispatcher endpoints on the `release-2.2` docs line, likely the REST API page under `docs/ops/rest_api`.
+
+**Tests to inspect or add**
+- `DispatcherRestEndpointTest` for direct coverage of which handler specs are exposed by the endpoint.
+- `RestServerEndpointTest` or the nearest REST-server lifecycle test, to confirm registration happens through the base endpoint contract.
+- Any `DispatcherRestEndpointITCase` or same-package integration test that exercises the live REST surface.
+- If coverage is thin, add a focused test that asserts the endpoint returns the expected dispatcher handler set from its initialization hook.
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/legacy/dispatcher/DispatcherRestEndpoint.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/legacy/dispatcher/DispatcherRestEndpointTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/legacy/RestServerEndpointTest.java`
+- Flink 2.2 REST API docs, dispatcher section on the `release-2.2` docs line
+
+**Uncertainties**
+- I’m confident about the architectural anchor, but the exact method name in 2.2.0 could be `initializeHandlers(...)` or a nearby variant depending on the final packaging of that release.
+- I’m also not certain of the exact published docs URL path without checking the repo/site, so I’d treat the docs citation above as the intended anchor rather than a verbatim path.

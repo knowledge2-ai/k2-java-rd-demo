@@ -1,0 +1,32 @@
+{
+  "winner": "B",
+  "confidence": 0.61,
+  "scores": {
+    "A": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 3
+    }
+  },
+  "rationale": "B is more actionable and version-anchored: it names the 2.2.0 docs, `JobDetailsHandler`, `JobDetailsHeaders`, `WebMonitorEndpoint`, and nearby tests. A is safer but too vague on the version-pinned docs and less grounded. B does overstate one docs connection, but overall it is the better engineer-facing anchor set.",
+  "critical_issues": {
+    "A": [
+      "Does not actually pin the docs to a concrete 2.2.0 URL or section.",
+      "Leaves the key analogue uncertain instead of anchoring to a specific neighboring handler.",
+      "Misses `JobDetailsHeaders` and endpoint wiring context."
+    ],
+    "B": [
+      "Claims the 2.2.0 docs explicitly call out `JobExceptionsHandler` as the example pattern, which may be unsupported.",
+      "Some neighboring tests look inferred rather than directly adjacent to `JobDetailsHandler`."
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "winner": "A",
+  "confidence": 0.92,
+  "scores": {
+    "A": {
+      "correctness": 5,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 4,
+      "risk": 5
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 3,
+      "risk": 2
+    }
+  },
+  "rationale": "A names version-pinned Kafka 4.2 Connect docs, the exact `DistributedHerder` source, and the neighboring `DistributedHerderTest`, which matches the requested anchor set. B is vaguer, uses a non-pinned docs root, and speculates about extra classes/tests without concrete support. A is more grounded and safer for an engineer inspecting the update path.",
+  "critical_issues": {
+    "A": [
+      "Does not identify the exact config-update method or specific test case inside `DistributedHerderTest`."
+    ],
+    "B": [
+      "Uses a generic documentation root instead of version-pinned 4.2.0 Connect docs.",
+      "Speculates about `KafkaConfigBackingStore` and nearby tests without concrete source anchors.",
+      "Too vague about the exact update path and neighboring regression coverage."
+    ]
+  }
+}

@@ -1,0 +1,147 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: kafka-connect-transformation
+TITLE: Kafka Connect pattern for Transformation
+QUESTION:
+For Kafka Connect 4.2.0, inspect `Transformation`: inspect single-message transform behavior. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "Spring Validator",
+    "Bean Validation",
+    "javax.validation"
+  ],
+  "required_api_surfaces": [
+    "connect"
+  ],
+  "required_modules": [
+    "docs",
+    "connect"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the 4.2-pinned Kafka Connect docs for high-level contract, then anchor the behavior discussion on the `Transformation` SPI itself and the Connect runtime tests that exercise transform wiring. The retrieved evidence does not include a direct 4.2.0 Javadoc page for `Transformation`, so any claim about single-message transform semantics should be tied back to the interface source and treated as incomplete if it needs exact lifecycle wording.
+
+**Implementation anchors**
+- Version-pinned docs:
+  - Kafka Connect overview: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+  - Connector Development Guide: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+  - The Connect user guide explicitly lists `org.apache.kafka.connect.transforms.Transformation` as an expected plugin type: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040)
+- Implementation class / SPI:
+  - `org.apache.kafka.connect.transforms.Transformation` in `connect/api/src/main/java/org/apache/kafka/connect/transforms/Transformation.java` is the interface to anchor single-message transform behavior: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/transforms/Transformation.java]
+- Nearby transform code for context:
+  - `Filter`: [repo://apache/kafka@4.2/connect/transforms/src/main/java/org/apache/kafka/connect/transforms/Filter.java]
+  - `RegexRouter`: [repo://apache/kafka@4.2/connect/transforms/src/main/java/org/apache/kafka/connect/transforms/RegexRouter.java]
+  - `RecordIsTombstone` predicate nearby in the same transforms area: [repo://apache/kafka@4.2/connect/transforms/src/main/java/org/apache/kafka/connect/transforms/predicates/RecordIsTombstone.java]
+
+**Tests to inspect or add**
+- Inspect:
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationConfigTest.java` for transform configuration composition and connector config interaction: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationConfigTest.java]
+  - `connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java` for duplicate transformation validation and runtime wiring: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+- Add if missing:
+  - A focused unit test around `Transformation.apply(...)` semantics for one record at a time, especially null/tombstone handling and record immutability.
+  - A regression test covering transform chaining order and failure propagation if that behavior matters for your change.
+
+**Citations**
+- Kafka Connect 4.2 docs: [https://kafka.apache.org/42/kafka-connect/](https://kafka.apache.org/42/kafka-connect/)
+- Connector Development Guide 4.2: [https://kafka.apache.org/42/kafka-connect/connector-development-guide/](https://kafka.apache.org/42/kafka-connect/connector-development-guide/)
+- User guide plugin types including `Transformation`: [https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040](https://kafka.apache.org/42/kafka-connect/user-guide/#part-0040)
+- `Transformation` interface source: [repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/transforms/Transformation.java]
+- `TransformationConfigTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationConfigTest.java]
+- `ConnectorValidationIntegrationTest`: [repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/ConnectorValidationIntegrationTest.java]
+
+**Uncertainties**
+- The retrieved evidence did not return the `Transformation` Javadoc or an implementation class beyond the interface, so I cannot cite exact single-message lifecycle wording from docs.
+- The evidence also did not surface a direct unit test that exercises `Transformation.apply()` end-to-end; the neighboring tests only cover config validation and connector wiring.
+
+ANSWER B:
+**Recommendation**
+Anchor the behavior on the API contract in `Transformation.java`, then back it with the runtime path in `TransformationStage` and `TransformationChain`. For docs, the repo’s pinned source-of-truth is the `TransformationDoc` generator wired into `build.gradle`, since the rendered Connect SMT docs are generated from that code in the 4.2 tree.
+
+**Implementation anchors**
+- `connect/api/src/main/java/org/apache/kafka/connect/transforms/Transformation.java` defines the single-message contract: one record in, one record out, or `null` to drop; no mutation of reachable record state; thread-safe implementation.
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/TransformationStage.java` is the per-stage adapter that applies an optional predicate, honors `negate`, and closes both predicate and transformation plugins.
+- `connect/runtime/src/main/java/org/apache/kafka/connect/runtime/TransformationChain.java` is the serial executor for SMTs; it applies stages in order, stops on `null`, and routes execution through `RetryWithToleranceOperator`.
+- For version-pinned docs generation, `connect/runtime/src/main/java/org/apache/kafka/connect/tools/TransformationDoc.java` plus the `genConnectTransformationDocs` task in `build.gradle` are the doc-producing anchors.
+
+**Tests to inspect or add**
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationStageTest.java`  
+  Directly exercises predicate gating, `negate`, and close behavior.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationConfigTest.java`  
+  Verifies SMT configs compose cleanly into connector config for the built-in transforms.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/integration/TransformationIntegrationTest.java`  
+  End-to-end coverage for `Filter` with predicates on sink/source connectors, including tombstones, headers, and topic matching.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java`  
+  Confirms source-task execution calls the transformation chain and closes it on shutdown.
+- `connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java`  
+  Confirms sink-task execution applies transformations before delivery and handles timestamp/header propagation around the chain.
+
+**Citations**
+- [Transformation.java](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/transforms/Transformation.java#L25-L62)
+- [package-info.java](repo://apache/kafka@4.2/connect/api/src/main/java/org/apache/kafka/connect/transforms/package-info.java#L1-L20)
+- [TransformationStage.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/TransformationStage.java#L30-L142)
+- [TransformationChain.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/runtime/TransformationChain.java#L33-L96)
+- [TransformationDoc.java](repo://apache/kafka@4.2/connect/runtime/src/main/java/org/apache/kafka/connect/tools/TransformationDoc.java#L39-L80)
+- [build.gradle](repo://apache/kafka@4.2/build.gradle#L3685-L3690)
+- [TransformationStageTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationStageTest.java#L38-L79)
+- [TransformationConfigTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/TransformationConfigTest.java#L42-L225)
+- [TransformationIntegrationTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/integration/TransformationIntegrationTest.java#L52-L318)
+- [WorkerSourceTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSourceTaskTest.java#L400-L418)
+- [WorkerSinkTaskTest.java](repo://apache/kafka@4.2/connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerSinkTaskTest.java#L196-L229)
+
+**Uncertainties**
+- The repo does not include the rendered Connect docs themselves, only the source and generator for them. So the most reliable “version-pinned docs” anchor here is the Javadoc/source doc plus `TransformationDoc`’s generated-doc path.
+- If you want a stricter behavior proof for chain short-circuiting on `null`, there is no dedicated `TransformationChainTest` in this tree; that would be the most natural test to add.

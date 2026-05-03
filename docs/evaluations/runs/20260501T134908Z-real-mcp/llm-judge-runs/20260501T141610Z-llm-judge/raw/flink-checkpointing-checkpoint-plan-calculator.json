@@ -1,0 +1,30 @@
+{
+  "winner": "A",
+  "confidence": 0.94,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 5,
+      "specificity": 5,
+      "usefulness": 5,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 2,
+      "usefulness": 2,
+      "risk": 1
+    }
+  },
+  "rationale": "A anchors the answer on the version-pinned 2.2 docs, the real `CheckpointPlanCalculator`/`DefaultCheckpointPlanCalculator` runtime seam, and concrete test files, while noting uncertainty. B is vaguer, omits the concrete implementation class, and cites a likely unverified `CheckpointPlanCalculatorTest`, which raises hallucination risk.",
+  "critical_issues": {
+    "A": [
+      "Some listed neighbors are helpers rather than clearly adjacent tests, so the test-anchoring is a bit loose."
+    ],
+    "B": [
+      "Cites `CheckpointPlanCalculatorTest` without verifying it exists in Flink 2.2.0.",
+      "Does not pin the docs version or name `DefaultCheckpointPlanCalculator`, which is the concrete implementation anchor."
+    ]
+  }
+}

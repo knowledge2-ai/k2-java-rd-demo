@@ -1,0 +1,32 @@
+{
+  "winner": "B",
+  "confidence": 0.83,
+  "scores": {
+    "A": {
+      "correctness": 2,
+      "grounding": 2,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 2
+    },
+    "B": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    }
+  },
+  "rationale": "B is better anchored to Kafka 4.2.0 by citing versioned Connect docs, the `SourceConnectorConfig` implementation, and a real validation call site in `AbstractHerder`. A is weaker because it only points at the docs root and includes a likely-unsubstantiated `TopicCreationConfigTest` anchor. B still has one somewhat tangential integration test, but overall it is more version-specific and actionable.",
+  "critical_issues": {
+    "A": [
+      "Uses only the docs root instead of versioned Connect validation pages.",
+      "Cites `TopicCreationConfigTest` without clear evidence it exists in 4.2.0.",
+      "Misses the `AbstractHerder` validation path that constructs/uses `SourceConnectorConfig`."
+    ],
+    "B": [
+      "Includes `ExactlyOnceSourceIntegrationTest`, which is adjacent but not a primary validation anchor.",
+      "Does not mention `AbstractHerderTest`, which is the closest unit-test neighbor for source connector validation."
+    ]
+  }
+}

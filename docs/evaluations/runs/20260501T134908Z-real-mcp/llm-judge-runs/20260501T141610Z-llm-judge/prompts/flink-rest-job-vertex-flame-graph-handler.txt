@@ -1,0 +1,134 @@
+You are an independent senior Java and distributed-systems evaluator. Judge two answers to the same Apache Flink/Kafka R&D question.
+
+Rules:
+- The answer labels are randomized. Do not infer system identity from style, citations, or tool references.
+- Prefer the answer that is more correct, version-specific, grounded in concrete source artifacts, and useful for an engineer changing Java code.
+- Penalize fabricated APIs, deprecated or unsupported claims, vague guidance, missing uncertainty, and citations that do not support the claim.
+- Use the evaluation context to understand topic scope; it is not a scoring rubric.
+- Return JSON only. No markdown, no prose outside JSON.
+
+Rubric dimensions, each integer 0-5:
+- correctness: technically correct for the named Flink/Kafka version and API surface.
+- grounding: cites or names relevant docs, implementation classes, tests, or source URIs.
+- specificity: gives concrete classes, methods, modules, tests, and implementation anchors.
+- usefulness: helps an engineer decide what to change or inspect next.
+- risk: avoids hallucinated classes, deprecated patterns, and overconfident unsupported claims.
+
+Required output schema:
+{
+  "winner": "A | B | tie",
+  "confidence": "number between 0 and 1",
+  "scores": {
+    "A": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    },
+    "B": {
+      "correctness": "integer 0-5",
+      "grounding": "integer 0-5",
+      "specificity": "integer 0-5",
+      "usefulness": "integer 0-5",
+      "risk": "integer 0-5, where 5 means low hallucination/deprecation risk"
+    }
+  },
+  "rationale": "short technical explanation, 80 words max",
+  "critical_issues": {
+    "A": [
+      "strings"
+    ],
+    "B": [
+      "strings"
+    ]
+  }
+}
+
+CASE ID: flink-rest-job-vertex-flame-graph-handler
+TITLE: Flink REST pattern for JobVertexFlameGraphHandler
+QUESTION:
+For Flink REST API 2.2.0, inspect `JobVertexFlameGraphHandler`: inspect flame-graph endpoint behavior for job vertices. Which version-pinned docs, implementation class, and neighboring tests should anchor the answer?
+
+EVALUATION CONTEXT:
+{
+  "expected_source_kinds": [
+    "docs",
+    "code",
+    "test"
+  ],
+  "hallucination_markers": [
+    "@RestController",
+    "Spring MVC",
+    "JAX-RS",
+    "servlet"
+  ],
+  "required_api_surfaces": [
+    "rest"
+  ],
+  "required_modules": [
+    "docs",
+    "flink-runtime"
+  ]
+}
+
+ANSWER A:
+**Recommendation**
+Use the version-pinned Flink 2.2.0 REST docs as the contract, then anchor implementation review on `JobVertexFlameGraphHandler` and its dedicated test. The endpoint is documented as `GET /jobs/:jobid/vertices/:vertexid/flamegraph`, returning flame-graph information for a vertex and potentially triggering sampling first [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0039].
+
+**Implementation anchors**
+- Docs contract: Flink 2.2.0 REST API, flame-graph endpoint section, including path, query params `type` (`FULL`, `ON_CPU`, `OFF_CPU`) and optional `subtaskindex`, and the note that sampling may be initiated on demand [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0039].
+- REST backend architecture: the 2.2.0 REST docs say the backend lives in `flink-runtime`, is routed by `WebMonitorEndpoint`, and new handlers are wired through `initializeHandlers()` [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002].
+- Implementation class: `JobVertexFlameGraphHandler` in `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandler.java`, which is the handler to inspect for exact runtime behavior [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandler.java].
+- Related message headers: `JobVertexFlameGraphHeaders` defines the route `/jobs/:jobid/vertices/:vertexid/flamegraph` and the request/response types [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobVertexFlameGraphHeaders.java].
+
+**Tests to inspect or add**
+- Primary regression test: `JobVertexFlameGraphHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandlerTest.java].
+- Neighboring REST handler tests for patterns and fixture style:
+  - `JobStatusHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobStatusHandlerTest.java]
+  - `JobExecutionResultHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobExecutionResultHandlerTest.java]
+  - `JobsOverviewHandlerTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobsOverviewHandlerTest.java]
+  - `CheckpointHandlersTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/checkpoints/CheckpointHandlersTest.java]
+  - `SavepointHandlersTest` [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/savepoints/SavepointHandlersTest.java]
+
+**Citations**
+- REST API docs, flame-graph endpoint: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0039]
+- REST API docs, handler architecture: [https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/ops/rest_api/#part-0002]
+- `JobVertexFlameGraphHandler`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandler.java]
+- `JobVertexFlameGraphHeaders`: [repo://apache/flink@release-2.2.0/flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/JobVertexFlameGraphHeaders.java]
+- `JobVertexFlameGraphHandlerTest`: [repo://apache/flink@release-2.2.0/flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandlerTest.java]
+
+**Uncertainties**
+- The retrieval system snippet included the relevant doc section and file anchors, but not the full handler or test bodies. So I can confirm the endpoint contract and the exact files to inspect, but I am not asserting method-level behavior beyond what the version-pinned docs explicitly state.
+
+ANSWER B:
+**Recommendation**
+Use the 2.2.0 REST API reference for the Job Vertex flame-graph endpoint as the contract, then verify the handler’s request/response wiring against the runtime REST implementation. The key question is whether `JobVertexFlameGraphHandler` returns flame graphs for a specific job vertex only, and how it behaves on missing vertex IDs, missing samples, or invalid query parameters.
+
+**Implementation anchors**
+- Version-pinned docs: the Flink 2.2.x REST API docs section for the Job Vertex Flame Graph endpoint.
+- Implementation class: `org.apache.flink.runtime.rest.handler.job.JobVertexFlameGraphHandler`
+- Related message/parameter types: the job-vertex flame-graph REST message and parameter classes in `org.apache.flink.runtime.rest.messages.job`
+
+**Tests to inspect or add**
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandlerTest.java`
+- Neighboring job-vertex handler tests in the same package, especially:
+  - `JobVertexBackPressureHandlerTest`
+  - `JobVertexDetailsHandlerTest`
+  - `JobVertexAccumulatorsHandlerTest`
+- Add/extend tests for:
+  - valid flame-graph generation for a vertex
+  - unknown job vertex ID
+  - empty/no-sample response path
+  - invalid request parameters, if the endpoint exposes any
+
+**Citations**
+- `flink-runtime/src/main/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandler.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexFlameGraphHandlerTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexBackPressureHandlerTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexDetailsHandlerTest.java`
+- `flink-runtime/src/test/java/org/apache/flink/runtime/rest/handler/job/JobVertexAccumulatorsHandlerTest.java`
+
+**Uncertainties**
+- I’m confident about the handler class and the test location, but I’m not fully certain of the exact version-pinned public docs URL/path from memory.
+- I’m also not certain which neighboring job-vertex handler tests exist in 2.2.0 beyond the flame-graph test, so treat the adjacent test list as the most likely set to check first.

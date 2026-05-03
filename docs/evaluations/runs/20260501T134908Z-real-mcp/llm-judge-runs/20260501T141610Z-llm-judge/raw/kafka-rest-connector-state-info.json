@@ -1,0 +1,32 @@
+{
+  "winner": "A",
+  "confidence": 0.84,
+  "scores": {
+    "A": {
+      "correctness": 4,
+      "grounding": 4,
+      "specificity": 4,
+      "usefulness": 4,
+      "risk": 4
+    },
+    "B": {
+      "correctness": 3,
+      "grounding": 2,
+      "specificity": 3,
+      "usefulness": 3,
+      "risk": 2
+    }
+  },
+  "rationale": "A answers the asked anchoring question directly with a version-pinned Kafka 4.2 docs URL and the concrete `ConnectorStateInfo` implementation class. B is directionally plausible but too generic on docs, adds weaker implementation guesses, and is less grounded for a version-specific engineering lookup.",
+  "critical_issues": {
+    "A": [
+      "The docs cited are broad Connect administration/overview pages; they may not explicitly name `ConnectorStateInfo`, so the contract still needs code-path confirmation.",
+      "The repository anchor uses `@4.2` rather than the exact `4.2.0` release tag or branch, which slightly weakens version precision."
+    ],
+    "B": [
+      "Fails to provide a version-pinned doc URL, which was the core of the question.",
+      "Introduces less-grounded implementation anchors like `ConnectorsResource` and herder lookup without source support.",
+      "Speculative test/field-shape guidance is not tied to a cited artifact."
+    ]
+  }
+}
