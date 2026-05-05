@@ -110,6 +110,49 @@ PATCH_ARM_NAMES = (
     "codex_with_k2_mcp_filters_off",
 )
 
+CODEX_INFRA_FAILURE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "codex_websocket_failure",
+        (
+            "failed to connect to websocket",
+            "backend-api/codex/responses",
+        ),
+    ),
+    (
+        "codex_model_refresh_failure",
+        (
+            "failed to refresh available models",
+            "backend-api/codex/models",
+        ),
+    ),
+    (
+        "codex_chatgpt_request_failure",
+        (
+            "http/request failed",
+            "backend-api/wham/apps",
+            "chatgpt.com/backend-api",
+        ),
+    ),
+    (
+        "codex_dns_failure",
+        (
+            "dns error",
+            "name resolution",
+            "temporary failure in name resolution",
+            "nodename nor servname",
+        ),
+    ),
+    (
+        "codex_network_failure",
+        (
+            "network is unreachable",
+            "connection reset",
+            "connection refused",
+            "tls handshake",
+        ),
+    ),
+)
+
 
 def patch_tasks(*, include_kafka: bool = True) -> tuple[PatchTask, ...]:
     """Return the built-in feature-task catalog.
@@ -954,9 +997,15 @@ def _retrieval_clause(task: PatchTask, arm_name: str) -> str:
             f"paths carefully. Cite retrieved source URIs. Suggested query: {task.k2_query}."
         )
     return (
-        "You must use the available K2 MCP retrieval tools before editing. Use them to inspect "
-        "version-specific docs, source, tests, and generated engineering guides. Cite the "
-        f"retrieved source URIs in your final summary. Suggested retrieval query: {task.k2_query}."
+        "You must use the available K2 MCP retrieval tool before editing. Make exactly one "
+        "`k2_answer_with_sources` call. Use K2 to inspect version-specific docs, source, "
+        "tests, and generated Confluence-style engineering guides before local exploration. "
+        "Avoid broad local `rg`; read only the exact files you plan to edit or exact "
+        "source/test paths returned by K2. "
+        "If a guide result includes a guardrail ID, cite that exact ID in the final Guide "
+        "compliance line, along with the retrieved guide source URI and forbidden patterns "
+        "avoided. Cite retrieved source URIs in your final summary. Suggested retrieval query: "
+        f"{task.k2_query}."
     )
 
 
@@ -1228,10 +1277,11 @@ def _guide_guardrail_score(
     citation_score = 1.0 if any(
         _normalize_text(citation) in haystack for citation in guide_citations
     ) else 0.0
+    diff_haystack = _normalize_text(diff_text)
     forbidden_hits = [
         pattern
         for pattern in task.forbidden_patterns
-        if _normalize_text(pattern) in haystack
+        if _normalize_text(pattern) in diff_haystack
     ]
     forbidden_score = 0.0 if forbidden_hits else 1.0
     return (required_score * 0.6) + (citation_score * 0.2) + (forbidden_score * 0.2)
@@ -1247,26 +1297,29 @@ def summarize_patch_scorecard(runs: Sequence[Mapping[str, Any]]) -> dict[str, An
             by_arm.setdefault(arm, []).append(run)
     summaries = []
     for arm_name, arm_runs in sorted(by_arm.items()):
-        scores = [float(run.get("score") or 0.0) for run in arm_runs]
+        valid_arm_runs = [run for run in arm_runs if not is_infra_invalid_run(run)]
+        scores = [float(run.get("score") or 0.0) for run in valid_arm_runs]
         durations = [
             float(run["duration_s"])
-            for run in arm_runs
+            for run in valid_arm_runs
             if isinstance(run.get("duration_s"), (int, float))
         ]
         total_tokens = [
             int((run.get("token_metrics") or {}).get("total_tokens") or 0)
-            for run in arm_runs
+            for run in valid_arm_runs
         ]
         guide_scores = [
             float((run.get("score_breakdown") or {}).get("guide_guardrail_score"))
-            for run in arm_runs
+            for run in valid_arm_runs
             if isinstance((run.get("score_breakdown") or {}).get("guide_guardrail_score"), (int, float))
         ]
         summaries.append(
             {
                 "arm_name": arm_name,
                 "task_count": len(arm_runs),
-                "passed_tasks": sum(1 for run in arm_runs if run.get("passed")),
+                "valid_task_count": len(valid_arm_runs),
+                "infra_invalid_tasks": len(arm_runs) - len(valid_arm_runs),
+                "passed_tasks": sum(1 for run in valid_arm_runs if run.get("passed")),
                 "mean_score": _mean(scores),
                 "mean_duration_s": _mean(durations),
                 "mean_total_tokens": _mean(total_tokens),
@@ -1290,8 +1343,10 @@ def assess_feature_development_signal(
 ) -> dict[str, Any]:
     """Apply the predeclared K2 feature-development decision rule."""
 
-    baseline = [run for run in runs if run.get("arm_name") == baseline_arm]
-    treatment = [run for run in runs if run.get("arm_name") == treatment_arm]
+    infra_invalid_count = sum(1 for run in runs if is_infra_invalid_run(run))
+    valid_runs = [run for run in runs if not is_infra_invalid_run(run)]
+    baseline = [run for run in valid_runs if run.get("arm_name") == baseline_arm]
+    treatment = [run for run in valid_runs if run.get("arm_name") == treatment_arm]
     paired_task_ids = sorted(
         {str(run.get("task_id")) for run in baseline}
         & {str(run.get("task_id")) for run in treatment}
@@ -1312,6 +1367,16 @@ def assess_feature_development_signal(
     duration_ratio = (
         round(treatment_duration / baseline_duration, 6) if baseline_duration else None
     )
+    baseline_duration_per_accepted_patch = _duration_per_accepted_patch(baseline)
+    treatment_duration_per_accepted_patch = _duration_per_accepted_patch(treatment)
+    duration_per_accepted_patch_ratio = (
+        round(
+            treatment_duration_per_accepted_patch / baseline_duration_per_accepted_patch,
+            6,
+        )
+        if baseline_duration_per_accepted_patch and treatment_duration_per_accepted_patch
+        else None
+    )
     baseline_tokens = _mean(
         [
             int((run.get("token_metrics") or {}).get("total_tokens") or 0)
@@ -1327,6 +1392,16 @@ def assess_feature_development_signal(
         ]
     )
     token_ratio = round(treatment_tokens / baseline_tokens, 6) if baseline_tokens else None
+    baseline_tokens_per_accepted_patch = _tokens_per_accepted_patch(baseline)
+    treatment_tokens_per_accepted_patch = _tokens_per_accepted_patch(treatment)
+    token_per_accepted_patch_ratio = (
+        round(
+            treatment_tokens_per_accepted_patch / baseline_tokens_per_accepted_patch,
+            6,
+        )
+        if baseline_tokens_per_accepted_patch and treatment_tokens_per_accepted_patch
+        else None
+    )
     baseline_guide_score = _mean_optional(
         [
             float((run.get("score_breakdown") or {}).get("guide_guardrail_score"))
@@ -1356,16 +1431,28 @@ def assess_feature_development_signal(
         guide_guardrail_delta is None or guide_guardrail_delta >= 0
     )
     duration_ok = duration_ratio is None or duration_ratio <= 1.3
+    duration_per_accepted_patch_ok = (
+        duration_per_accepted_patch_ratio is None
+        or duration_per_accepted_patch_ratio <= 0.9
+    )
     token_savings_ok = token_ratio is not None and token_ratio <= 0.9
+    token_per_accepted_patch_savings_ok = (
+        token_per_accepted_patch_ratio is not None
+        and token_per_accepted_patch_ratio <= 0.9
+    )
     quality_ok = (
         pass_rate_delta >= 0.15
         and guide_guardrail_ok
-        and duration_ok
     )
+    usable_output_efficiency_ok = (
+        duration_ok or duration_per_accepted_patch_ok
+    ) and token_per_accepted_patch_savings_ok
     if len(paired_task_ids) < min_tasks_for_claim:
         verdict = "insufficient_sample"
-    elif quality_ok and token_savings_ok:
+    elif quality_ok and token_savings_ok and usable_output_efficiency_ok:
         verdict = "k2_wins"
+    elif quality_ok and token_savings_ok:
+        verdict = "k2_quality_token_win_with_latency_tradeoff"
     elif quality_ok:
         verdict = "k2_quality_win_without_token_savings"
     elif abs(pass_rate_delta) <= 0.05:
@@ -1375,6 +1462,7 @@ def assess_feature_development_signal(
     return {
         "baseline_arm": baseline_arm,
         "treatment_arm": treatment_arm,
+        "infra_invalid_count": infra_invalid_count,
         "paired_task_count": len(paired_task_ids),
         "min_tasks_for_claim": min_tasks_for_claim,
         "baseline_pass_rate": round(baseline_pass_rate, 6),
@@ -1383,10 +1471,19 @@ def assess_feature_development_signal(
         "baseline_mean_duration_s": baseline_duration,
         "treatment_mean_duration_s": treatment_duration,
         "duration_ratio": duration_ratio,
+        "baseline_duration_per_accepted_patch_s": baseline_duration_per_accepted_patch,
+        "treatment_duration_per_accepted_patch_s": treatment_duration_per_accepted_patch,
+        "duration_per_accepted_patch_ratio": duration_per_accepted_patch_ratio,
+        "duration_per_accepted_patch_ok": duration_per_accepted_patch_ok,
         "baseline_mean_total_tokens": baseline_tokens,
         "treatment_mean_total_tokens": treatment_tokens,
         "token_ratio": token_ratio,
         "token_savings_ok": token_savings_ok,
+        "baseline_tokens_per_accepted_patch": baseline_tokens_per_accepted_patch,
+        "treatment_tokens_per_accepted_patch": treatment_tokens_per_accepted_patch,
+        "token_per_accepted_patch_ratio": token_per_accepted_patch_ratio,
+        "token_per_accepted_patch_savings_ok": token_per_accepted_patch_savings_ok,
+        "usable_output_efficiency_ok": usable_output_efficiency_ok,
         "baseline_mean_guide_guardrail_score": baseline_guide_score,
         "treatment_mean_guide_guardrail_score": treatment_guide_score,
         "guide_guardrail_delta": guide_guardrail_delta,
@@ -1420,8 +1517,27 @@ def verify_patch_scorecard_evidence(
     issues: list[str] = []
     checks: dict[str, bool] = {}
 
-    baseline = _runs_by_task(run_rows, baseline_arm)
-    treatment = _runs_by_task(run_rows, treatment_arm)
+    baseline_raw = _runs_by_task(run_rows, baseline_arm)
+    treatment_raw = _runs_by_task(run_rows, treatment_arm)
+    raw_paired_task_ids = sorted(set(baseline_raw) & set(treatment_raw))
+    checks["no_infra_invalid_runs"] = True
+    for task_id in raw_paired_task_ids:
+        for arm_name, run in (
+            (baseline_arm, baseline_raw[task_id]),
+            (treatment_arm, treatment_raw[task_id]),
+        ):
+            if is_infra_invalid_run(run):
+                checks["no_infra_invalid_runs"] = False
+                reason = (
+                    run.get("infra_failure_reason")
+                    or classify_codex_infra_failure(str(run.get("error") or ""))
+                    or "unknown"
+                )
+                issues.append(f"{task_id}: {arm_name} run is infrastructure-invalid ({reason})")
+
+    valid_run_rows = [run for run in run_rows if not is_infra_invalid_run(run)]
+    baseline = _runs_by_task(valid_run_rows, baseline_arm)
+    treatment = _runs_by_task(valid_run_rows, treatment_arm)
     paired_task_ids = sorted(set(baseline) & set(treatment))
     checks["paired_sample_size"] = len(paired_task_ids) >= min_tasks_for_claim
     if not checks["paired_sample_size"]:
@@ -1500,7 +1616,11 @@ def render_patch_scorecard_audit(audit: Mapping[str, Any]) -> str:
         f"- Paired tasks: `{signal.get('paired_task_count')}`",
         f"- Pass-rate delta: `{_format_float(signal.get('pass_rate_delta'))}`",
         f"- Duration ratio: `{_format_float(signal.get('duration_ratio'))}`",
+        "- Duration per accepted patch ratio: "
+        f"`{_format_float(signal.get('duration_per_accepted_patch_ratio'))}`",
         f"- Token ratio: `{_format_float(signal.get('token_ratio'))}`",
+        "- Tokens per accepted patch ratio: "
+        f"`{_format_float(signal.get('token_per_accepted_patch_ratio'))}`",
         f"- Guide score delta: `{_format_float(signal.get('guide_guardrail_delta'))}`",
         "",
         "## Checks",
@@ -1526,14 +1646,16 @@ def render_patch_report(payload: Mapping[str, Any]) -> str:
         "",
         "## Summary",
         "",
-        "| Arm | Tasks | Passed | Mean score | Mean duration s | Mean total tokens | Mean guide score |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Arm | Tasks | Valid | Infra invalid | Passed | Mean score | Mean duration s | Mean total tokens | Mean guide score |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for arm in summary.get("arms", []):
         lines.append(
-            "| {arm} | `{tasks}` | `{passed}` | `{score}` | `{duration}` | `{tokens}` | `{guide}` |".format(
+            "| {arm} | `{tasks}` | `{valid}` | `{invalid}` | `{passed}` | `{score}` | `{duration}` | `{tokens}` | `{guide}` |".format(
                 arm=arm.get("arm_name"),
                 tasks=arm.get("task_count"),
+                valid=arm.get("valid_task_count", arm.get("task_count")),
+                invalid=arm.get("infra_invalid_tasks", 0),
                 passed=arm.get("passed_tasks"),
                 score=_format_float(arm.get("mean_score")),
                 duration=_format_float(arm.get("mean_duration_s")),
@@ -1554,8 +1676,14 @@ def render_patch_report(payload: Mapping[str, Any]) -> str:
                 f"- Pass-rate delta ({signal.get('treatment_arm')} minus "
                 f"{signal.get('baseline_arm')}): `{_format_float(signal.get('pass_rate_delta'))}`",
                 f"- Duration ratio: `{_format_float(signal.get('duration_ratio'))}`",
+                "- Duration per accepted patch ratio: "
+                f"`{_format_float(signal.get('duration_per_accepted_patch_ratio'))}`",
                 f"- Token ratio: `{_format_float(signal.get('token_ratio'))}`",
+                "- Tokens per accepted patch ratio: "
+                f"`{_format_float(signal.get('token_per_accepted_patch_ratio'))}`",
                 f"- Token-savings threshold met: `{str(bool(signal.get('token_savings_ok'))).lower()}`",
+                "- Usable-output efficiency threshold met: "
+                f"`{str(bool(signal.get('usable_output_efficiency_ok'))).lower()}`",
                 f"- Guide score delta: `{_format_float(signal.get('guide_guardrail_delta'))}`",
                 f"- Guide threshold met: `{str(bool(signal.get('guide_guardrail_ok'))).lower()}`",
                 "",
@@ -1603,6 +1731,11 @@ def render_patch_report(payload: Mapping[str, Any]) -> str:
                 f"### {run.get('title')} (`{run.get('task_id')}`)",
                 "",
                 f"- Arm: `{run.get('arm_name')}`",
+                f"- Run status: `{run.get('run_status') or 'completed'}`",
+                (
+                    "- Infra failure reason: "
+                    f"`{run.get('infra_failure_reason') or classify_codex_infra_failure(str(run.get('error') or ''))}`"
+                ),
                 f"- Score: `{_format_float(run.get('score'))}`",
                 f"- Passed: `{str(run.get('passed')).lower()}`",
                 f"- Duration seconds: `{_format_float(run.get('duration_s'))}`",
@@ -1790,6 +1923,34 @@ def _pass_rate(runs: Sequence[Mapping[str, Any]]) -> float:
     return sum(1 for run in runs if run.get("passed")) / len(runs)
 
 
+def _duration_per_accepted_patch(runs: Sequence[Mapping[str, Any]]) -> float | None:
+    passed = sum(1 for run in runs if run.get("passed"))
+    if not passed:
+        return None
+    durations = [
+        float(run["duration_s"])
+        for run in runs
+        if isinstance(run.get("duration_s"), (int, float))
+    ]
+    if not durations:
+        return None
+    return round(sum(durations) / passed, 6)
+
+
+def _tokens_per_accepted_patch(runs: Sequence[Mapping[str, Any]]) -> float | None:
+    passed = sum(1 for run in runs if run.get("passed"))
+    if not passed:
+        return None
+    token_counts = [
+        int((run.get("token_metrics") or {}).get("total_tokens") or 0)
+        for run in runs
+        if int((run.get("token_metrics") or {}).get("total_tokens") or 0) > 0
+    ]
+    if not token_counts:
+        return None
+    return round(sum(token_counts) / passed, 6)
+
+
 def _summaries_by_key(
     runs: Sequence[Mapping[str, Any]],
     key: str,
@@ -1803,18 +1964,103 @@ def _summaries_by_key(
         grouped.setdefault((group_value, arm_name), []).append(run)
     rows = []
     for (group_value, arm_name), group_runs in sorted(grouped.items()):
-        scores = [float(run.get("score") or 0.0) for run in group_runs]
+        valid_group_runs = [run for run in group_runs if not is_infra_invalid_run(run)]
+        scores = [float(run.get("score") or 0.0) for run in valid_group_runs]
         rows.append(
             {
                 key: group_value,
                 "arm_name": arm_name,
                 "task_count": len(group_runs),
-                "passed_tasks": sum(1 for run in group_runs if run.get("passed")),
-                "pass_rate": round(_pass_rate(group_runs), 6),
+                "valid_task_count": len(valid_group_runs),
+                "infra_invalid_tasks": len(group_runs) - len(valid_group_runs),
+                "passed_tasks": sum(1 for run in valid_group_runs if run.get("passed")),
+                "pass_rate": round(_pass_rate(valid_group_runs), 6),
                 "mean_score": _mean(scores),
             }
         )
     return rows
+
+
+def classify_codex_infra_failure(error_text: str | None) -> str:
+    """Return a stable infra-failure reason for Codex transport errors."""
+
+    if not error_text:
+        return ""
+    normalized = _normalize_text(error_text)
+    for reason, markers in CODEX_INFRA_FAILURE_PATTERNS:
+        if any(marker in normalized for marker in markers):
+            return reason
+    return ""
+
+
+def is_infra_invalid_run(run: Mapping[str, Any]) -> bool:
+    """Whether a run should be excluded from claim-grade scoring."""
+
+    if str(run.get("run_status") or "") == "infra_invalid":
+        return True
+    if classify_codex_infra_failure(str(run.get("error") or "")):
+        return True
+    categories = run.get("failure_categories") or []
+    return any(str(category) == "codex_infra_failure" for category in categories)
+
+
+def merge_patch_scorecard_payloads(
+    payloads: Sequence[Mapping[str, Any]],
+    *,
+    prefer_later: bool = True,
+) -> dict[str, Any]:
+    """Merge scorecards, replacing earlier task/arm rows with retry rows."""
+
+    if not payloads:
+        raise ValueError("at least one scorecard payload is required")
+    merged: dict[str, Any] = dict(payloads[0])
+    task_rows: dict[str, Mapping[str, Any]] = {}
+    run_rows: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for payload in payloads:
+        for task in payload.get("tasks") or []:
+            if isinstance(task, Mapping) and task.get("task_id"):
+                task_rows[str(task["task_id"])] = task
+        for run in payload.get("runs") or []:
+            if not isinstance(run, Mapping):
+                continue
+            key = (str(run.get("task_id") or ""), str(run.get("arm_name") or ""))
+            if not key[0] or not key[1]:
+                continue
+            existing = run_rows.get(key)
+            if existing is None:
+                run_rows[key] = run
+                continue
+            current_invalid = is_infra_invalid_run(existing)
+            retry_invalid = is_infra_invalid_run(run)
+            if (current_invalid and not retry_invalid) or (prefer_later and not retry_invalid):
+                run_rows[key] = run
+    runs = list(run_rows.values())
+    merged["tasks"] = list(task_rows.values())
+    merged["runs"] = runs
+    merged["summary"] = summarize_patch_scorecard(runs)
+    merged["preflight"] = _merged_preflight(payloads)
+    merged["merged_from"] = [payload.get("run_id") for payload in payloads if payload.get("run_id")]
+    return merged
+
+
+def _merged_preflight(payloads: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    successful_k2_probe: dict[str, Any] | None = None
+    for payload in payloads:
+        preflight = payload.get("preflight")
+        if not isinstance(preflight, Mapping):
+            continue
+        for key, value in preflight.items():
+            if key != "k2_probe":
+                merged[key] = value
+        k2_probe = preflight.get("k2_probe")
+        if isinstance(k2_probe, Mapping) and (_int_value(k2_probe.get("result_count")) or 0) > 0:
+            successful_k2_probe = dict(k2_probe)
+        elif "k2_probe" not in merged:
+            merged["k2_probe"] = k2_probe
+    if successful_k2_probe is not None:
+        merged["k2_probe"] = successful_k2_probe
+    return merged
 
 
 def _failure_category_counts(runs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -1824,6 +2070,8 @@ def _failure_category_counts(runs: Sequence[Mapping[str, Any]]) -> list[dict[str
         if not arm_name:
             continue
         categories = run.get("failure_categories") or []
+        if is_infra_invalid_run(run):
+            categories = sorted({*categories, "codex_infra_failure"})
         if not categories and not run.get("passed"):
             categories = ["unclassified_failure"]
         for category in categories:
@@ -1932,9 +2180,12 @@ __all__ = [
     "PatchTask",
     "VerificationCommand",
     "assess_feature_development_signal",
+    "classify_codex_infra_failure",
     "classify_patch_failure",
     "extract_changed_files",
     "extract_codex_usage_metrics",
+    "is_infra_invalid_run",
+    "merge_patch_scorecard_payloads",
     "patch_generation_prompt",
     "patch_tasks",
     "render_patch_report",

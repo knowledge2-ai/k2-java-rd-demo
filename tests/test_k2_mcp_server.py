@@ -14,6 +14,7 @@ from k2_java_rd_demo.k2_mcp_server import (
     _enrich_rows_with_local_sources,
     _hybrid_for_source_kind,
     _is_retriable_sdk_error,
+    _metadata_filter,
     _normalize_target_rows,
     _preferred_anchor_terms,
     tool_specs,
@@ -108,8 +109,22 @@ class K2McpServerTests(unittest.TestCase):
         self.assertFalse(response["result"]["isError"])
         self.assertTrue(calls)
         payload = json.loads(response["result"]["content"][0]["text"])
-        self.assertNotIn("guides", {search["name"] for search in payload["searches"]})
-        self.assertNotIn("guide", {search["source_kind"] for search in payload["searches"]})
+        filter_text = "\n".join(json.dumps(call["filters"]) for call in calls)
+        self.assertNotIn('"value": "guide"', filter_text)
+        self.assertNotIn("searches", payload)
+
+    def test_compact_tool_surface_only_exposes_answer_tool(self) -> None:
+        server = K2McpServer(K2McpConfig(compact_tool_surface=True))
+
+        listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        tool_names = [tool["name"] for tool in listed["result"]["tools"]]
+
+        self.assertEqual(tool_names, ["k2_answer_with_sources"])
+        self.assertEqual(set(server.tools), {"k2_answer_with_sources"})
+        self.assertEqual(
+            [tool["name"] for tool in tool_specs(compact_tool_surface=True)],
+            ["k2_answer_with_sources"],
+        )
 
     def test_tool_call_returns_mcp_content_and_logs(self) -> None:
         server = K2McpServer(K2McpConfig(case_id="case-1"))
@@ -188,12 +203,14 @@ class K2McpServerTests(unittest.TestCase):
         config = K2McpConfig.from_env(
             {
                 "K2_MCP_DISABLE_METADATA_FILTERS": "true",
+                "K2_MCP_COMPACT_TOOL_SURFACE": "true",
                 "K2_MCP_RETRIEVAL_PROFILE": "metadata_exact",
                 "K2_MCP_SOURCE_BASE": "/tmp/sources",
             }
         )
 
         self.assertTrue(config.disable_metadata_filters)
+        self.assertTrue(config.compact_tool_surface)
         self.assertEqual(config.retrieval_profile, "metadata_exact")
         self.assertEqual(config.source_base, "/tmp/sources")
 
@@ -262,6 +279,57 @@ class K2McpServerTests(unittest.TestCase):
         self.assertTrue(calls)
         self.assertTrue(all(call["filters"] for call in calls))
 
+    def test_guide_filters_ignore_java_source_path_match(self) -> None:
+        filters = _metadata_filter(
+            framework="flink",
+            source_kind="guide",
+            api_surface="rest",
+            path_match="flink-runtime/src/main/java/org/apache/flink/runtime/rest/messages/",
+        )
+        filter_text = json.dumps(filters)
+
+        self.assertIn('"value": "rest"', filter_text)
+        self.assertIn('"value": "2.2.0"', filter_text)
+        self.assertNotIn("flink-runtime/src/main/java", filter_text)
+
+    def test_kafka_guide_filter_accepts_generated_guide_version(self) -> None:
+        filters = _metadata_filter(
+            framework="kafka",
+            source_kind="guide",
+            api_surface="connect",
+        )
+
+        version_filter = next(
+            item for item in filters["filters"] if item["key"] == "framework_version"
+        )
+        self.assertEqual(version_filter["op"], "in")
+        self.assertIn("4.2", version_filter["value"])
+        self.assertIn("4.2.0", version_filter["value"])
+
+    def test_search_role_normalizes_kafka_connect_runtime_api_surface(self) -> None:
+        server = K2McpServer(K2McpConfig())
+        calls = []
+
+        def fake_retrieval(**kwargs):
+            calls.append(kwargs)
+            return {"results": []}
+
+        server._retrieval_search = fake_retrieval  # type: ignore[method-assign]
+
+        server._search_role(
+            {
+                "query": "CF-KAFKA-CONNECT-007",
+                "framework": "kafka",
+                "api_surface": "connect/runtime",
+            },
+            role="guides",
+            source_kind="guide",
+        )
+        filter_text = json.dumps(calls[0]["filters"])
+
+        self.assertIn('"value": "connect"', filter_text)
+        self.assertNotIn("connect/runtime", filter_text)
+
     def test_answer_tool_runs_dynamic_target_class_lookups(self) -> None:
         server = K2McpServer(K2McpConfig(case_id="case-1"))
         calls = []
@@ -311,13 +379,11 @@ class K2McpServerTests(unittest.TestCase):
         self.assertIn('"value": "Foo.java"', filter_text)
         self.assertIn('"value": "FooTest.java"', filter_text)
         self.assertEqual(payload["target_class_names"], ("Foo",))
-        self.assertEqual(
-            payload["answer_style"]["section_contract"]["Recommendation"].split()[0],
-            "Exactly",
-        )
-        self.assertIn("self-verifying", payload["tool_guidance"])
-        self.assertIn("omit broader related evidence", payload["tool_guidance"])
-        self.assertIn("local rg/file-read", payload["tool_guidance"])
+        self.assertNotIn("answer_style", payload)
+        self.assertNotIn("role_queries", payload)
+        self.assertNotIn("searches", payload)
+        self.assertIn("preferred_sources", payload["tool_guidance"])
+        self.assertIn("Guide compliance", payload["tool_guidance"])
         preferred_uris = {source["source_uri"] for source in payload["preferred_sources"]}
         self.assertIn("repo://apache/flink@release-2.2.0/Foo.java", preferred_uris)
         self.assertIn("repo://apache/flink@release-2.2.0/FooTest.java", preferred_uris)
@@ -336,6 +402,8 @@ class K2McpServerTests(unittest.TestCase):
             "5a336892424a9458653ead89610bf60d771ab8d7/Foo.java",
             target_urls,
         )
+        self.assertEqual(payload["results"], payload["preferred_sources"])
+        self.assertTrue(all("text" in source for source in payload["preferred_sources"]))
 
     def test_local_source_enrichment_adds_line_snippets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

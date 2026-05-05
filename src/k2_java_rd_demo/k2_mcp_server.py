@@ -85,38 +85,6 @@ RETURN_CONFIG = {
     "include_scores": True,
     "include_provenance": True,
 }
-ANSWER_STYLE = {
-    "goal": "Synthesize K2 evidence in the same direct style a strong local rg/file-read answer would use.",
-    "target_length": "140-260 words unless the question explicitly asks for broader design context.",
-    "rules": [
-        "Start with one source-local finding: class.method -> exact behavior, with a clickable line citation.",
-        "Prefer code and test anchors over docs when answering implementation questions.",
-        "When a source has web_line_url or web_source_url, cite that clickable URL.",
-        "When no clickable URL is present, cite line_source_uri before the bare source_uri.",
-        "Do not shorten citation paths; keep line fragments when provided.",
-        "Make each important claim self-verifying for a reader who only sees the final answer.",
-        "Each implementation bullet should make one atomic claim supported by one citation.",
-        "Always cite the requested target class or interface source when it appears in citation_targets.",
-        "Use line_snippet evidence to name the exact method, config key, helper return expression, or registration flow.",
-        "When a wrapper helper is cited, state both the wrapper call and the concrete expression inside that helper.",
-        "Do not mark evidence as missing if a preferred source line_snippet contains that method body.",
-        "For Java config APIs, prefer code constants/enums over docs fragments for exact key names.",
-        "Use docs only for public contract/version context or when docs are the requested artifact.",
-        "Do not include broader related classes, docs, or tests unless they directly prove the answer.",
-        "Do not enumerate every retrieved source; cite only the sources that support the answer.",
-        "Use 2-4 implementation-anchor bullets and 1-3 direct test-anchor bullets.",
-        "Keep uncertainties to missing or weak evidence, and put them last.",
-        "Do not mention K2, MCP, retrieval internals, scores, filters, or tool calls in the final answer.",
-    ],
-    "section_contract": {
-        "Recommendation": "Exactly 1-2 direct sentences naming the file/class, method, and behavior with a citation.",
-        "Implementation anchors": "2-4 bullets. One atomic source-local claim per bullet, each with one line citation.",
-        "Tests to inspect or add": "1-3 bullets, direct neighboring tests only; avoid broad integration tests unless line evidence proves relevance.",
-        "Citations": "Only the URLs or source URIs cited above; do not add unused retrieved sources.",
-        "Uncertainties": "Only missing direct evidence or 'None from the cited evidence.'",
-    },
-}
-
 SERVER_NAME = "k2-java-rd-demo"
 SERVER_VERSION = "0.1.0"
 DEFAULT_SOURCE_BASE = Path("/tmp/k2-java-rd-demo-sources")
@@ -134,6 +102,7 @@ class K2McpConfig:
     case_id: str | None = None
     disable_metadata_filters: bool = False
     disable_guides: bool = False
+    compact_tool_surface: bool = False
     retrieval_profile: str = "java_exact"
     source_base: str | None = str(DEFAULT_SOURCE_BASE)
 
@@ -150,6 +119,7 @@ class K2McpConfig:
             case_id=_clean(env.get("K2_MCP_CASE_ID")),
             disable_metadata_filters=_env_flag(env.get("K2_MCP_DISABLE_METADATA_FILTERS")),
             disable_guides=_env_flag(env.get("K2_MCP_DISABLE_GUIDES")),
+            compact_tool_surface=_env_flag(env.get("K2_MCP_COMPACT_TOOL_SURFACE")),
             retrieval_profile=env.get("K2_MCP_RETRIEVAL_PROFILE", "java_exact").strip()
             or "java_exact",
             source_base=_clean(env.get("K2_MCP_SOURCE_BASE")) or str(DEFAULT_SOURCE_BASE),
@@ -163,13 +133,18 @@ class K2McpServer:
         self.config = config or K2McpConfig.from_env()
         self._sdk_client: Any | None = None
         self.tools: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
-            "k2_search_docs": self._search_docs,
-            "k2_search_code": self._search_code,
-            "k2_search_tests": self._search_tests,
             "k2_answer_with_sources": self._answer_with_sources,
         }
-        if not self.config.disable_guides:
-            self.tools["k2_search_guides"] = self._search_guides
+        if not self.config.compact_tool_surface:
+            self.tools.update(
+                {
+                    "k2_search_docs": self._search_docs,
+                    "k2_search_code": self._search_code,
+                    "k2_search_tests": self._search_tests,
+                }
+            )
+            if not self.config.disable_guides:
+                self.tools["k2_search_guides"] = self._search_guides
 
     def serve(self) -> None:
         mode: TransportMode = "content-length"
@@ -208,7 +183,12 @@ class K2McpServer:
             if method == "tools/list":
                 return _result(
                     request_id,
-                    {"tools": tool_specs(disable_guides=self.config.disable_guides)},
+                    {
+                        "tools": tool_specs(
+                            disable_guides=self.config.disable_guides,
+                            compact_tool_surface=self.config.compact_tool_surface,
+                        )
+                    },
                 )
             if method == "tools/call":
                 params = _as_dict(message.get("params"))
@@ -256,7 +236,9 @@ class K2McpServer:
     def _answer_with_sources(self, args: dict[str, Any]) -> dict[str, Any]:
         query = _required_str(args, "query")
         framework = _framework(args)
-        api_surface = _clean(args.get("api_surface")) or _infer_api_surface(framework, query)
+        api_surface = _normalize_api_surface(framework, args.get("api_surface")) or _infer_api_surface(
+            framework, query
+        )
         top_k = _top_k(args, default=5)
         target_class_names = _target_class_names(args, query)
         role_queries = _answer_queries(framework=framework, api_surface=api_surface, query=query)
@@ -311,34 +293,27 @@ class K2McpServer:
             target_class_names=target_class_names,
             source_base=self.config.source_base,
         )
+        preferred_sources = _preferred_sources(results, target_class_names, query=query)
         return {
             "query": query,
             "framework": framework,
             "api_surface": api_surface,
             "target_class_names": target_class_names,
             "citation_targets": _citation_targets(results, target_class_names),
-            "preferred_sources": _preferred_sources(results, target_class_names, query=query),
-            "role_queries": role_queries,
-            "answer_style": ANSWER_STYLE,
-            "retrieval_profile": self.config.retrieval_profile,
+            "preferred_sources": preferred_sources,
             "tool_guidance": (
-                "Use these K2 sources for exact claims, but write the final answer like a "
-                "concise local rg/file-read result. Start with one source-local finding, "
-                "use preferred_sources as the citation budget, cite web_line_url or web_source_url "
-                "when present, otherwise cite line_source_uri or source_uri inline, make every "
-                "important claim self-verifying from the final text, cite citation_targets when "
-                "present, omit broader related evidence unless it directly proves the answer, and "
-                "move genuinely missing evidence to Uncertainties instead of leading with it."
+                "Use only preferred_sources for exact claims. Cite web_line_url or "
+                "web_source_url when present, otherwise line_source_uri or source_uri. "
+                "Copy any guide guardrail ID and guide source_uri into Guide compliance."
             ),
-            "searches": searches,
-            "results": results,
+            "results": preferred_sources,
         }
 
     def _search_role(self, args: dict[str, Any], *, role: str, source_kind: str) -> dict[str, Any]:
         query = _required_str(args, "query")
         framework = _framework(args)
         top_k = _top_k(args)
-        api_surface = _clean(args.get("api_surface"))
+        api_surface = _normalize_api_surface(framework, args.get("api_surface"))
         class_name = _clean(args.get("class_name"))
         path = _clean(args.get("path"))
         path_match = _clean(args.get("path_match"))
@@ -509,7 +484,20 @@ class K2McpServer:
             )
 
 
-def tool_specs(*, disable_guides: bool = False) -> list[dict[str, Any]]:
+def tool_specs(
+    *, disable_guides: bool = False, compact_tool_surface: bool = False
+) -> list[dict[str, Any]]:
+    answer_spec = {
+        "name": "k2_answer_with_sources",
+        "description": (
+            "Return the concise guide, docs, code, and test evidence needed for a scoped "
+            "Java patch. Use this first for end-to-end customer answers."
+        ),
+        "inputSchema": _input_schema(),
+    }
+    if compact_tool_surface:
+        return [answer_spec]
+
     specs = [
         _tool_spec(
             "k2_search_docs",
@@ -526,14 +514,7 @@ def tool_specs(*, disable_guides: bool = False) -> list[dict[str, Any]]:
             "Search neighboring test files and validation patterns in K2.",
             source_kind="test",
         ),
-        {
-            "name": "k2_answer_with_sources",
-            "description": (
-                "Run guide, docs, code, and test searches together and return source-grounded "
-                "evidence. Prefer this tool for end-to-end customer answers."
-            ),
-            "inputSchema": _input_schema(),
-        },
+        answer_spec,
     ]
     if not disable_guides:
         specs.insert(
@@ -602,17 +583,25 @@ def _metadata_filter(
             else:
                 filters.append(in_("api_surface", ["rest", "checkpointing"]))
     else:
-        filters.append(eq("framework_version", "4.2.0"))
+        if source_kind == "guide":
+            filters.append(in_("framework_version", ["4.2", "4.2.0"]))
+        else:
+            filters.append(eq("framework_version", "4.2.0"))
         if not skip_api_surface:
             if api_surface:
                 filters.append(eq("api_surface", api_surface))
             else:
                 filters.append(eq("api_surface", "connect"))
-    if class_name:
+
+    guide_path_filter_allowed = source_kind != "guide" or (
+        bool(path and path.startswith("guides/"))
+        or bool(path_match and path_match.startswith("guides/"))
+    )
+    if class_name and source_kind != "guide":
         filters.append(eq("class_name", class_name))
-    if path:
+    if path and guide_path_filter_allowed:
         filters.append(eq("path", path))
-    if path_match:
+    if path_match and guide_path_filter_allowed:
         filters.append(text_match("path", path_match))
     return structured_filter(filters)
 
@@ -624,6 +613,24 @@ def _infer_api_surface(framework: str, query: str) -> str:
     if "checkpoint" in lowered or "savepoint" in lowered or "state backend" in lowered:
         return "checkpointing"
     return "rest"
+
+
+def _normalize_api_surface(framework: str, value: Any) -> str | None:
+    text = _clean(value)
+    if not text:
+        return None
+    lowered = text.lower()
+    if framework == "kafka":
+        if "connect" in lowered:
+            return "connect"
+        if "rest" in lowered:
+            return "rest"
+    if framework == "flink":
+        if "checkpoint" in lowered or "savepoint" in lowered:
+            return "checkpointing"
+        if "rest" in lowered:
+            return "rest"
+    return text
 
 
 def _answer_queries(*, framework: str, api_surface: str, query: str) -> dict[str, Any]:
@@ -652,7 +659,10 @@ def _answer_queries(*, framework: str, api_surface: str, query: str) -> dict[str
             ),
         ]
         return {
-            "guides": f"{base} REST handler implementation checklist",
+            "guides": (
+                f"{base} CF-FLINK-REST-001 Confluence REST Handler Guardrails "
+                "forbidden Spring MVC servlet JAX-RS"
+            ),
             "docs": f"{base} Flink REST API endpoint request response body",
             "code": _dedupe_strings(code_queries),
             "tests": _dedupe_strings(test_queries),
@@ -666,7 +676,10 @@ def _answer_queries(*, framework: str, api_surface: str, query: str) -> dict[str
         }
     if framework == "kafka" and api_surface == "rest":
         return {
-            "guides": f"{base} Kafka Connect REST validation checklist",
+            "guides": (
+                f"{base} CF-KAFKA-CONNECT-007 Confluence REST Entity Compatibility "
+                "Guardrails optional JSON nullable Jackson entity tests"
+            ),
             "docs": f"{base} Kafka Connect REST API administration connectors",
             "code": f"{base} implementation source Connect REST resource",
             "tests": f"{base} neighboring regression test Connect REST resource",
@@ -691,7 +704,10 @@ def _answer_queries(*, framework: str, api_surface: str, query: str) -> dict[str
                 ]
             )
         return {
-            "guides": f"{base} Kafka Connect validation checklist",
+            "guides": (
+                f"{base} CF-KAFKA-CONNECT-007 Confluence REST Entity Compatibility "
+                "Guardrails optional JSON nullable Jackson entity tests"
+            ),
             "docs": f"{base} Kafka Connect connector development guide",
             "code": _dedupe_strings(code_queries),
             "tests": _dedupe_strings(test_queries),
@@ -1025,7 +1041,7 @@ def _preferred_sources(
 ) -> list[dict[str, Any]]:
     """Return a small source budget for rg-like final answers."""
 
-    limits = {"code": 6, "test": 3, "docs": 1, "guide": 1}
+    limits = {"code": 4, "test": 2, "docs": 1, "guide": 1}
     selected: list[dict[str, Any]] = []
     counts = {kind: 0 for kind in limits}
     seen: set[str] = set()
@@ -1041,6 +1057,9 @@ def _preferred_sources(
         source_uri = str(row.get("source_uri") or "")
         if not source_uri or source_uri in seen:
             continue
+        text_preview = str(row.get("line_snippet") or row.get("raw_text") or row.get("text") or "")[
+            :420
+        ]
         seen.add(source_uri)
         counts[source_kind] += 1
         selected.append(
@@ -1055,9 +1074,8 @@ def _preferred_sources(
                 "api_surface": metadata.get("api_surface"),
                 "class_name": metadata.get("class_name"),
                 "path": metadata.get("path"),
-                "text_preview": str(
-                    row.get("line_snippet") or row.get("raw_text") or row.get("text") or ""
-                )[:1200],
+                "text": text_preview,
+                "text_preview": text_preview,
             }
         )
     return selected

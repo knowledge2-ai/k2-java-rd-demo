@@ -166,6 +166,129 @@ class PatchGenerationRunnerTests(unittest.TestCase):
                     ]
                 )
 
+    def test_run_verification_records_missing_executable_as_failed_check(self) -> None:
+        runner = _load_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            subprocesses = [
+                ["git", "init"],
+                ["git", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "base"],
+            ]
+            for argv in subprocesses:
+                runner.subprocess.run(argv, cwd=worktree, check=True, capture_output=True)
+
+            task = runner.PatchTask(
+                task_id="missing-tool",
+                title="Missing tool",
+                framework="kafka",
+                version="4.2.0",
+                repo="apache/kafka",
+                repo_ref="4.2",
+                source_root_key="kafka",
+                prompt="Test missing executable handling.",
+                success_criteria=("record failure",),
+                expected_paths=("Example.java",),
+                allowed_path_prefixes=("",),
+                verification_commands=(
+                    runner.VerificationCommand(
+                        name="missing-gradle-wrapper",
+                        argv=("./does-not-exist", "test"),
+                    ),
+                ),
+            )
+
+            results = runner._run_verification(task, worktree, run_tests=True)
+
+        missing = next(result for result in results if result["name"] == "missing-gradle-wrapper")
+        self.assertEqual(missing["returncode"], 127)
+        self.assertFalse(missing["passed"])
+        self.assertIn("No such file or directory", missing["stderr_tail"])
+
+    def test_git_diff_excludes_build_artifacts(self) -> None:
+        runner = _load_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            runner.subprocess.run(["git", "init"], cwd=worktree, check=True, capture_output=True)
+            source_file = worktree / "src/main/java/Example.java"
+            source_file.parent.mkdir(parents=True)
+            source_file.write_text("class Example {}\n", encoding="utf-8")
+            runner.subprocess.run(["git", "add", "."], cwd=worktree, check=True, capture_output=True)
+            runner.subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-m",
+                    "base",
+                ],
+                cwd=worktree,
+                check=True,
+                capture_output=True,
+            )
+            source_file.write_text("class Example { int value; }\n", encoding="utf-8")
+            target_file = worktree / "module/target/classes/Generated.class"
+            target_file.parent.mkdir(parents=True)
+            target_file.write_text("generated\n", encoding="utf-8")
+            gradle_file = worktree / ".gradle/cache/file.bin"
+            gradle_file.parent.mkdir(parents=True)
+            gradle_file.write_text("cache\n", encoding="utf-8")
+
+            diff_text = runner._git_diff(worktree)
+
+        self.assertIn("src/main/java/Example.java", diff_text)
+        self.assertNotIn("target/classes/Generated.class", diff_text)
+        self.assertNotIn(".gradle/cache/file.bin", diff_text)
+
+    def test_git_diff_check_excludes_build_artifacts(self) -> None:
+        runner = _load_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            runner.subprocess.run(["git", "init"], cwd=worktree, check=True, capture_output=True)
+            source_file = worktree / "src/main/java/Example.java"
+            source_file.parent.mkdir(parents=True)
+            source_file.write_text("class Example {}\n", encoding="utf-8")
+            runner.subprocess.run(["git", "add", "."], cwd=worktree, check=True, capture_output=True)
+            runner.subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-m",
+                    "base",
+                ],
+                cwd=worktree,
+                check=True,
+                capture_output=True,
+            )
+            source_file.write_text("class Example { int value; }\n", encoding="utf-8")
+            target_file = worktree / "module/target/classes/Generated.txt"
+            target_file.parent.mkdir(parents=True)
+            target_file.write_text("generated trailing whitespace \n", encoding="utf-8")
+            task = runner.PatchTask(
+                task_id="diff-check",
+                title="Diff check",
+                framework="other",
+                version="1",
+                repo="example/repo",
+                repo_ref="main",
+                source_root_key="other",
+                prompt="Test diff check pathspec.",
+                success_criteria=("record pass",),
+                expected_paths=("src/main/java/Example.java",),
+                allowed_path_prefixes=("src/main/java/",),
+            )
+
+            results = runner._run_verification(task, worktree, run_tests=True)
+
+        diff_check = next(result for result in results if result["name"] == "git-diff-check")
+        self.assertTrue(diff_check["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()

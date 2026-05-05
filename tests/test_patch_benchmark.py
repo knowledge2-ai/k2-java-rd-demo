@@ -9,9 +9,11 @@ from tests import _paths  # noqa: F401
 
 from k2_java_rd_demo.patch_benchmark import (
     assess_feature_development_signal,
+    classify_codex_infra_failure,
     classify_patch_failure,
     extract_changed_files,
     extract_codex_usage_metrics,
+    merge_patch_scorecard_payloads,
     patch_generation_prompt,
     patch_tasks,
     render_patch_report,
@@ -67,7 +69,8 @@ class PatchBenchmarkTests(unittest.TestCase):
             "generated://guides/flink/confluence-rest-handler-guardrails.md",
             repo_plus_guides,
         )
-        self.assertIn("K2 MCP retrieval tools", with_k2)
+        self.assertIn("K2 MCP retrieval tool", with_k2)
+        self.assertIn("exactly one `k2_answer_with_sources` call", with_k2)
         self.assertIn("must use", with_k2)
         self.assertIn("guide retrieval", with_k2_no_guides)
         self.assertIn(task.prompt, with_k2)
@@ -161,6 +164,34 @@ index 0000000..3333333
             local_dump_passing["score_breakdown"]["guide_guardrail_score"],
             1.0,
         )
+
+    def test_guide_compliance_can_name_forbidden_patterns_avoided(self) -> None:
+        task = next(task for task in patch_tasks(include_kafka=True) if task.framework == "kafka")
+        diff = "\n".join(
+            f"diff --git a/{path} b/{path}\nindex 111..222 100644"
+            for path in task.expected_paths
+        )
+        answer_text = (
+            "Applied CF-KAFKA-CONNECT-007 from "
+            "generated://guides/kafka/confluence-connect-rest-entity-guardrails.md. "
+            "Avoided forbidden patterns: Spring Validator, Bean Validation, javax.validation."
+        )
+
+        passing = score_patch_run(
+            task,
+            diff_text=diff,
+            answer_text=answer_text,
+            verification_results=[{"name": "test", "passed": True}],
+        )
+        forbidden_diff = score_patch_run(
+            task,
+            diff_text=f"{diff}\n+import javax.validation.Valid;\n",
+            answer_text=answer_text,
+            verification_results=[{"name": "test", "passed": True}],
+        )
+
+        self.assertEqual(passing["score_breakdown"]["guide_guardrail_score"], 1.0)
+        self.assertEqual(forbidden_diff["score_breakdown"]["guide_guardrail_score"], 0.8)
 
     def test_score_patch_run_penalizes_out_of_scope_files(self) -> None:
         task = patch_tasks(include_kafka=False)[0]
@@ -397,6 +428,47 @@ index 0000000..3333333
         )
         self.assertFalse(high_token_signal["token_savings_ok"])
 
+    def test_assess_feature_development_signal_uses_accepted_patch_efficiency(self) -> None:
+        runs = _claim_runs(baseline_pass_count=3, treatment_duration=20)
+
+        signal = assess_feature_development_signal(runs)
+
+        self.assertEqual(signal["verdict"], "k2_wins")
+        self.assertFalse(signal["duration_ok"])
+        self.assertTrue(signal["duration_per_accepted_patch_ok"])
+        self.assertTrue(signal["usable_output_efficiency_ok"])
+
+    def test_codex_transport_errors_are_infrastructure_failures(self) -> None:
+        reason = classify_codex_infra_failure(
+            "failed to connect to websocket wss://chatgpt.com/backend-api/codex/responses"
+        )
+
+        self.assertEqual(reason, "codex_websocket_failure")
+
+    def test_signal_excludes_infrastructure_invalid_runs(self) -> None:
+        runs = _claim_runs()
+        k2_run = next(
+            run
+            for run in runs
+            if run["arm_name"] == "codex_with_k2_mcp" and run["task_id"] == "task-0"
+        )
+        k2_run["run_status"] = "infra_invalid"
+        k2_run["infra_failure_reason"] = "codex_websocket_failure"
+        k2_run["failure_categories"] = ["codex_infra_failure"]
+
+        signal = assess_feature_development_signal(runs)
+        summary = summarize_patch_scorecard(runs)
+
+        self.assertEqual(signal["paired_task_count"], 9)
+        self.assertEqual(signal["infra_invalid_count"], 1)
+        self.assertEqual(signal["verdict"], "insufficient_sample")
+        k2_summary = next(
+            row for row in summary["arms"] if row["arm_name"] == "codex_with_k2_mcp"
+        )
+        self.assertEqual(k2_summary["task_count"], 10)
+        self.assertEqual(k2_summary["valid_task_count"], 9)
+        self.assertEqual(k2_summary["infra_invalid_tasks"], 1)
+
     def test_verify_patch_scorecard_evidence_accepts_real_k2_claim_shape(self) -> None:
         payload = _claim_payload()
 
@@ -432,11 +504,82 @@ index 0000000..3333333
         self.assertFalse(audit["claim_ready"])
         self.assertFalse(audit["checks"]["k2_tool_failures_absent"])
 
+    def test_verify_patch_scorecard_evidence_rejects_infrastructure_invalid_runs(self) -> None:
+        payload = _claim_payload()
+        k2_run = next(
+            run
+            for run in payload["runs"]
+            if run["arm_name"] == "codex_with_k2_mcp" and run["task_id"] == "task-0"
+        )
+        k2_run["run_status"] = "infra_invalid"
+        k2_run["infra_failure_reason"] = "codex_websocket_failure"
+        k2_run["failure_categories"] = ["codex_infra_failure"]
 
-def _claim_runs(*, treatment_tokens: int = 1000) -> list[dict]:
+        audit = verify_patch_scorecard_evidence(payload)
+
+        self.assertFalse(audit["claim_ready"])
+        self.assertFalse(audit["checks"]["no_infra_invalid_runs"])
+        self.assertIn("infrastructure-invalid", "\n".join(audit["issues"]))
+
+    def test_merge_patch_scorecard_payloads_replaces_invalid_retry_rows(self) -> None:
+        original = _claim_payload()
+        retry = _claim_payload()
+        original_k2 = next(
+            run
+            for run in original["runs"]
+            if run["arm_name"] == "codex_with_k2_mcp" and run["task_id"] == "task-0"
+        )
+        original_k2["run_status"] = "infra_invalid"
+        original_k2["infra_failure_reason"] = "codex_websocket_failure"
+        original_k2["failure_categories"] = ["codex_infra_failure"]
+        retry["runs"] = [
+            run
+            for run in retry["runs"]
+            if run["arm_name"] == "codex_with_k2_mcp" and run["task_id"] == "task-0"
+        ]
+        retry["runs"][0]["token_metrics"]["total_tokens"] = 900
+
+        merged = merge_patch_scorecard_payloads(
+            [original, retry],
+            prefer_later=False,
+        )
+        merged_k2 = next(
+            run
+            for run in merged["runs"]
+            if run["arm_name"] == "codex_with_k2_mcp" and run["task_id"] == "task-0"
+        )
+
+        self.assertEqual(merged_k2["token_metrics"]["total_tokens"], 900)
+        self.assertFalse(merged_k2.get("run_status") == "infra_invalid")
+
+    def test_merge_patch_scorecard_payloads_preserves_later_k2_probe(self) -> None:
+        baseline = _claim_payload()
+        treatment = _claim_payload()
+        baseline["preflight"]["k2_probe"] = None
+
+        merged = merge_patch_scorecard_payloads([baseline, treatment])
+
+        self.assertEqual(merged["preflight"]["k2_probe"]["result_count"], 1)
+
+    def test_merge_patch_scorecard_payloads_preserves_earlier_k2_probe(self) -> None:
+        probed = _claim_payload()
+        retry_without_probe = _claim_payload()
+        retry_without_probe["preflight"]["k2_probe"] = None
+
+        merged = merge_patch_scorecard_payloads([probed, retry_without_probe])
+
+        self.assertEqual(merged["preflight"]["k2_probe"]["result_count"], 1)
+
+
+def _claim_runs(
+    *,
+    baseline_pass_count: int = 7,
+    treatment_duration: int = 11,
+    treatment_tokens: int = 1000,
+) -> list[dict]:
     runs = []
     for index in range(10):
-        baseline_passed = index < 7
+        baseline_passed = index < baseline_pass_count
         runs.append(
             {
                 "task_id": f"task-{index}",
@@ -455,7 +598,7 @@ def _claim_runs(*, treatment_tokens: int = 1000) -> list[dict]:
                 "task_id": f"task-{index}",
                 "arm_name": "codex_with_k2_mcp",
                 "passed": True,
-                "duration_s": 11,
+                "duration_s": treatment_duration,
                 "token_metrics": {
                     "event_count": 10,
                     "total_tokens": treatment_tokens,

@@ -31,6 +31,7 @@ from k2_java_rd_demo.patch_benchmark import (  # noqa: E402
     PATCH_ARM_NAMES,
     PatchTask,
     VerificationCommand,
+    classify_codex_infra_failure,
     extract_changed_files,
     extract_codex_usage_metrics,
     patch_generation_prompt,
@@ -47,6 +48,15 @@ DEFAULT_ARMS = ("codex_repo_plus_guides_dump", "codex_with_k2_mcp")
 LOCAL_AGENT_FEATURES = (
     "features.browser_use=false",
     "features.web_search_request=false",
+)
+DIFF_PATHSPEC = (
+    ".",
+    ":(exclude)**/target/**",
+    ":(exclude)**/build/**",
+    ":(exclude).gradle/**",
+    ":(exclude)**/.gradle/**",
+    ":(exclude)**/.plxarc",
+    ":(exclude)**/gradle-wrapper.jar",
 )
 
 
@@ -189,6 +199,7 @@ def _run_task_arm(
         error_text = f"Codex timed out after {exc.timeout}s"
         _write_text(artifact_dir / "codex-error.txt", error_text)
     duration_s = time.perf_counter() - start
+    infra_failure_reason = classify_codex_infra_failure(error_text)
 
     diff_text = _git_diff(task_dir)
     _write_text(artifact_dir / "patch.diff", diff_text)
@@ -212,11 +223,18 @@ def _run_task_arm(
         score["failure_categories"] = sorted(
             {*score.get("failure_categories", []), "k2_mcp_tool_failure"}
         )
+    if infra_failure_reason:
+        score["passed"] = False
+        score["failure_categories"] = sorted(
+            {*score.get("failure_categories", []), "codex_infra_failure"}
+        )
     if not args.keep_worktrees:
         shutil.rmtree(task_dir, ignore_errors=True)
     return {
         **score,
         "arm_name": arm_name,
+        "run_status": "infra_invalid" if infra_failure_reason else "completed",
+        "infra_failure_reason": infra_failure_reason,
         "answer_path": _relative_artifact_path(answer_path, out_dir),
         "patch_path": _relative_artifact_path(artifact_dir / "patch.diff", out_dir),
         "verification_path": _relative_artifact_path(artifact_dir / "verification.json", out_dir),
@@ -253,6 +271,7 @@ def _codex_config(
                     "mcp_servers.k2-java-rd.env.K2_MCP_DISABLE_METADATA_FILTERS="
                     f'"{str(arm_name == "codex_with_k2_mcp_filters_off").lower()}"'
                 ),
+                'mcp_servers.k2-java-rd.env.K2_MCP_COMPACT_TOOL_SURFACE="true"',
                 'mcp_servers.k2-java-rd.env_vars=["K2_API_KEY"]',
                 *_api_host_override(args.api_host),
                 "mcp_servers.k2-java-rd.startup_timeout_sec=60",
@@ -302,6 +321,10 @@ def _run_verification(
             returncode = completed.returncode
             stdout = completed.stdout[-4000:]
             stderr = completed.stderr[-4000:]
+        except FileNotFoundError as exc:
+            returncode = 127
+            stdout = ""
+            stderr = str(exc)
         except subprocess.TimeoutExpired as exc:
             returncode = 124
             stdout = (exc.stdout or "")[-4000:] if isinstance(exc.stdout, str) else ""
@@ -318,13 +341,16 @@ def _run_verification(
                 "stderr_tail": stderr,
             }
         )
-    results.append(validate_local_java_imports(task, worktree, changed_files))
+    if not run_tests:
+        results.append(validate_local_java_imports(task, worktree, changed_files))
     return results
 
 
 def _resolve_verification_argv(argv: tuple[str, ...] | list[str], worktree: Path) -> tuple[str, ...]:
     if not argv:
         return argv
+    if tuple(argv) == ("git", "diff", "--check"):
+        return ("git", "diff", "--check", "--", *DIFF_PATHSPEC)
     executable = argv[0]
     if executable == "./mvnw" and not (worktree / "mvnw").exists() and shutil.which("mvn"):
         return ("mvn", *argv[1:])
@@ -410,7 +436,7 @@ def _git_diff(worktree: Path) -> str:
         timeout=120,
     )
     completed = subprocess.run(
-        ["git", "diff", "--binary"],
+        ["git", "diff", "--binary", "--", *DIFF_PATHSPEC],
         cwd=worktree,
         text=True,
         capture_output=True,
